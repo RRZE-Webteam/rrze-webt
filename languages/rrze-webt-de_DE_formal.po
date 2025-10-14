@@ -1,0 +1,334 @@
+# Copyright (C) 2025 RRZE Webteam
+# This file is distributed under the GNU General Public License Version 3.
+msgid ""
+msgstr ""
+"Project-Id-Version: RRZE WEB-T Translator 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/rrze-webt\n"
+"POT-Creation-Date: 2025-10-14T09:05:06+00:00\n"
+"PO-Revision-Date: 2025-10-14 11:19+0200\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: de_DE@formal\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.7\n"
+"X-Domain: rrze-webt\n"
+
+# #. Plugin Name of the plugin
+#: rrze-webt.php
+msgid "RRZE WEB-T Translator"
+msgstr "RRZE WEB-T Übersetzer"
+
+#. Plugin URI of the plugin
+#: rrze-webt.php
+msgid "https://github.com/RRZE-Webteam/rrze-webt"
+msgstr "https://github.com/RRZE-Webteam/rrze-webt"
+
+#. Description of the plugin
+#: rrze-webt.php
+msgid ""
+"Integrates the WEB-T translation API into the block editor to translate post "
+"content while editing."
+msgstr ""
+"Integriert die WEB-T-Übersetzungs-API in den Blockeditor, um Post-Inhalte "
+"während der Bearbeitung zu übersetzen."
+
+#. Author of the plugin
+#: rrze-webt.php
+msgid "RRZE Webteam"
+msgstr "RRZE-Webteam"
+
+#. Author URI of the plugin
+#: rrze-webt.php
+msgid "https://blogs.fau.de/webworking/"
+msgstr "https://blogs.fau.de/webworking/"
+
+#: includes/EditorAssets.php:57 build/editor.js:1 src/editor.js:30
+msgid "WEB-T Translation"
+msgstr "WEB-T-Übersetzung"
+
+#: includes/EditorAssets.php:58 build/editor.js:1 src/editor.js:525
+msgid "Translate content"
+msgstr "Inhalte übersetzen"
+
+#: includes/EditorAssets.php:59 build/editor.js:1 src/editor.js:513
+msgid "Target language"
+msgstr "Zielsprache"
+
+#: includes/EditorAssets.php:60 build/editor.js:1 src/editor.js:501
+msgid "Source language"
+msgstr "Ausgangssprache"
+
+#: includes/EditorAssets.php:61 build/editor.js:1 src/editor.js:320
+msgid "Auto detect"
+msgstr "Automatizierte Erkennung"
+
+#: includes/EditorAssets.php:62 build/editor.js:1 src/editor.js:493
+msgid ""
+"Please provide the WEB-T application name and password to enable "
+"translations."
+msgstr ""
+"Bitte geben Sie den Namen und das Passwort der WEB-T-Anwendung an, um "
+"Übersetzungen zu ermöglichen."
+
+#: includes/EditorAssets.php:63 build/editor.js:1 src/editor.js:525
+msgid "Translating…"
+msgstr "Übersetzen…"
+
+#: includes/EditorAssets.php:64
+msgid "Content translated with WEB-T."
+msgstr "Mit WEB-T übersetzte Inhalte."
+
+#: includes/EditorAssets.php:65
+msgid "Translation failed. Check the console for details."
+msgstr ""
+"Die Übersetzung ist fehlgeschlagen. Weitere Informationen finden Sie in der "
+"Konsole."
+
+#: includes/EditorAssets.php:66 build/editor.js:1 src/editor.js:91
+msgid ""
+"Translation request submitted. The translated content will appear "
+"automatically once ready."
+msgstr ""
+"Übersetzungsanfrage eingereicht. Der übersetzte Inhalt wird automatisch "
+"angezeigt, sobald er fertig ist."
+
+#: includes/EditorAssets.php:67 build/editor.js:1 src/editor.js:92
+msgid "The translation service reported a failure."
+msgstr "Der Übersetzungsdienst hat einen Fehler gemeldet."
+
+#: includes/EditorAssets.php:68 includes/EditorAssets.php:75
+#: includes/JobStore.php:90 build/editor.js:1 src/editor.js:93
+#: src/editor.js:102
+msgid "Translation received from WEB-T."
+msgstr "Übersetzung von WEB-T."
+
+#: includes/EditorAssets.php:69 build/editor.js:1 src/editor.js:94
+msgid "Translation jobs"
+msgstr "Übersetzungsaufträge"
+
+#: includes/EditorAssets.php:70 build/editor.js:1 src/editor.js:96
+msgid "Pending"
+msgstr "Ausstehend"
+
+#: includes/EditorAssets.php:71 build/editor.js:1 src/editor.js:97
+msgid "Failed"
+msgstr "Fehlgeschlagen"
+
+#: includes/EditorAssets.php:72 build/editor.js:1 src/editor.js:98
+msgid "Completed"
+msgstr "Abgeschlossen"
+
+#: includes/EditorAssets.php:73 build/editor.js:1 src/editor.js:100
+msgid "No details available."
+msgstr "Keine Details verfügbar."
+
+#: includes/EditorAssets.php:74 includes/JobStore.php:38 build/editor.js:1
+#: src/editor.js:101
+msgid "Waiting for WEB-T to process this translation request."
+msgstr "Warten darauf, dass WEB-T diese Übersetzungsanforderung verarbeitet."
+
+#: includes/EditorAssets.php:76 build/editor.js:1 src/editor.js:103
+msgid "WEB-T request ID:"
+msgstr "WEB-T-Anforderungs-ID:"
+
+#: includes/EditorAssets.php:77 build/editor.js:1 src/editor.js:104
+msgid "Client token:"
+msgstr "Client-Token:"
+
+#: includes/EditorAssets.php:78 build/editor.js:1 src/editor.js:105
+msgid "Submitted:"
+msgstr "Eingereicht:"
+
+#: includes/EditorAssets.php:79 build/editor.js:1 src/editor.js:106
+msgid "Updated:"
+msgstr "Aktualisiert:"
+
+#: includes/EditorAssets.php:80 build/editor.js:1 src/editor.js:107
+msgid "Elapsed:"
+msgstr "Geçen:"
+
+#. translators: %s: number of minutes.
+#: includes/EditorAssets.php:82 build/editor.js:1 src/editor.js:109
+#, php-format
+msgid "%s minutes"
+msgstr "%s Minuten"
+
+#. translators: %s: number of seconds.
+#: includes/EditorAssets.php:84 build/editor.js:1 src/editor.js:108
+#, php-format
+msgid "%s seconds"
+msgstr "%s Sekunden"
+
+#. translators: %s: number of hours.
+#: includes/EditorAssets.php:86 build/editor.js:1 src/editor.js:110
+#, php-format
+msgid "%s hours"
+msgstr "%s Stunden"
+
+#: includes/EditorAssets.php:87 build/editor.js:1 src/editor.js:111
+msgid "Translated title:"
+msgstr "Übersetzter Titel:"
+
+#: includes/EditorAssets.php:88 build/editor.js:1 src/editor.js:112
+msgid "There are no translation jobs yet."
+msgstr "Es gibt noch keine Übersetzungsaufträge."
+
+#: includes/RestController.php:112
+msgid "There is no content to translate."
+msgstr "Es gibt keinen Inhalt zu übersetzen."
+
+#: includes/RestController.php:116
+msgid "The selected target language is not allowed."
+msgstr "Die ausgewählte Zielsprache ist nicht erlaubt."
+
+#: includes/RestController.php:158
+msgid "The translation request was submitted to WEB-T."
+msgstr "Die Übersetzungsanfrage wurde an WEB-T übermittelt."
+
+#: includes/RestController.php:180
+msgid "The raw post content to translate."
+msgstr "Der Rohinhalt des Posts, der übersetzt werden soll."
+
+#: includes/RestController.php:185
+msgid "The target language code."
+msgstr "Der Code der Zielsprache."
+
+#: includes/RestController.php:190
+msgid "Optional source language code."
+msgstr "Optionaler Code in der Quellsprache."
+
+#: includes/RestController.php:196
+msgid "The current post ID to validate permissions."
+msgstr "Die aktuelle Beitrags-ID zum Überprüfen von Berechtigungen."
+
+#: includes/RestController.php:202
+msgid "The post title to translate."
+msgstr "Der Titel des zu übersetzenden Beitrags."
+
+#: includes/RestController.php:323
+msgid "The WEB-T service reported an unspecified error."
+msgstr "Der WEB-T-Dienst hat einen nicht näher bezeichneten Fehler gemeldet."
+
+#: includes/RestController.php:349
+msgid "WEB-T callback payload is not valid JSON."
+msgstr "Die WEB-T-Callback-Nutzlast ist kein gültiges JSON."
+
+#: includes/RestController.php:358
+msgid "WEB-T callback payload is missing the translated content."
+msgstr "In der WEB-T-Callback-Payload fehlt der übersetzte Inhalt."
+
+#: includes/RestController.php:364
+msgid "WEB-T callback content is not valid base64."
+msgstr "WEB-T-Callback-Inhalte sind nicht gültig, Base64."
+
+#: includes/RestController.php:386
+msgid "WEB-T callback did not include any content."
+msgstr "Der WEB-T-Callback enthielt keinen Inhalt."
+
+#: includes/Settings.php:19
+msgid "WEB-T API Settings"
+msgstr "WEB-T API-Einstellungen"
+
+#: includes/Settings.php:26
+msgid "API Endpoint URL"
+msgstr "URL des API-Endpunkts"
+
+#: includes/Settings.php:34
+msgid "Application Name"
+msgstr "Anwendungsname"
+
+#: includes/Settings.php:42
+msgid "Password"
+msgstr "Passwort"
+
+#: includes/Settings.php:52 includes/Settings.php:53 includes/Settings.php:100
+msgid "WEB-T Translator"
+msgstr "WEB-T Übersetzer"
+
+#: includes/Settings.php:61
+msgid ""
+"Configure the credentials used to communicate with the WEB-T translation API."
+msgstr ""
+"Konfigurieren Sie die Anmeldeinformationen, die für die Kommunikation mit "
+"der WEB-T-Übersetzungs-API verwendet werden."
+
+#: includes/WebTClient.php:91
+msgid "Please configure the WEB-T application name and password first."
+msgstr ""
+"Bitte konfigurieren Sie zuerst den Namen und das Passwort der WEB-T-"
+"Anwendung."
+
+#. translators: %1$d: HTTP status code, %2$s: response body
+#: includes/WebTClient.php:209
+#, php-format
+msgid "The WEB-T API returned an unexpected status code (%1$d): %2$s"
+msgstr ""
+"Die WEB-T-API hat einen unerwarteten Statuscode (%1$d) zurückgegeben: %2$s"
+
+#: includes/WebTClient.php:243 includes/WebTClient.php:275
+msgid "The WEB-T service rejected the translation request."
+msgstr "Der WEB-T-Dienst hat die Übersetzungsanforderung abgelehnt."
+
+#: includes/WebTClient.php:284
+msgid "The WEB-T API reported an error."
+msgstr "Die WEB-T-API hat einen Fehler gemeldet."
+
+#: includes/WebTClient.php:290
+msgid "The WEB-T API returned an invalid response."
+msgstr "Die WEB-T-API hat eine ungültige Antwort zurückgegeben."
+
+#: includes/WebTClient.php:338
+msgid "The WEB-T API response did not include a translation."
+msgstr "Die WEB-T-API-Antwort enthielt keine Übersetzung."
+
+#: includes/WebTClient.php:495
+msgid "Unable to obtain the authentication challenge from the WEB-T service."
+msgstr ""
+"Die Authentifizierungsabfrage vom WEB-T-Dienst kann nicht abgerufen werden."
+
+#: includes/WebTClient.php:512
+msgid "The WEB-T service returned an invalid authentication challenge."
+msgstr ""
+"Der WEB-T-Dienst hat eine ungültige Authentifizierungsaufforderung "
+"zurückgegeben."
+
+#: includes/WebTClient.php:614
+msgid "Empty response from the WEB-T service."
+msgstr "Leere Antwort vom WEB-T-Dienst."
+
+#: build/editor.js:1 src/editor.js:333
+msgid "Fetching translation jobs…"
+msgstr "Übersetzungsaufträge werden abgerufen…"
+
+#: build/editor.js:1 src/editor.js:498
+msgid "A translation is in progress. Please wait until it finishes."
+msgstr ""
+"Eine Übersetzung ist in Arbeit. Bitte warten Sie, bis der Vorgang "
+"abgeschlossen ist."
+
+#: build/editor.js:1 src/editor.js:411
+msgid "Please configure the WEB-T application name and password."
+msgstr ""
+"Bitte konfigurieren Sie den Namen und das Kennwort der WEB-T-Anwendung."
+
+#: build/editor.js:1 src/editor.js:419
+msgid "Nothing to translate. Add content first."
+msgstr "Nichts zu übersetzen. Fügen Sie zuerst Inhalte hinzu."
+
+#: build/editor.js:1 src/editor.js:461
+msgid "Content translated successfully."
+msgstr "Der Inhalt wurde erfolgreich übersetzt."
+
+#: build/editor.js:1 src/editor.js:472 src/editor.js:476
+msgid "Translation failed."
+msgstr "Die Übersetzung ist fehlgeschlagen."
+
+#: src/editor.js:359
+msgid "Hide details"
+msgstr "Details ausblenden"
+
+#: src/editor.js:359
+msgid "Show details"
+msgstr "Details anzeigen"
