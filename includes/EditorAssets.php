@@ -4,11 +4,24 @@ namespace RRZE\WebT;
 
 defined('ABSPATH') || exit;
 
+/**
+ * Manages the inclusion of block editor assets and exposes configuration to the editor.
+ * 
+ * @package RRZE\WebT
+ */
 class EditorAssets
 {
-    /** @var Settings */
+    /**
+     * @var Settings
+     */
     private $settings;
 
+    /**
+     * Constructor.
+     * 
+     * @param Settings $settings The settings instance.
+     * @return void
+     */
     public function __construct(Settings $settings)
     {
         $this->settings = $settings;
@@ -17,6 +30,8 @@ class EditorAssets
 
     /**
      * Enqueue editor scripts/styles and expose config to the block editor.
+     * 
+     * @return void
      */
     public function enqueue_editor_scripts(): void
     {
