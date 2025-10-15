@@ -10,6 +10,11 @@ use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
 
+/**
+ * REST API controller for handling translation requests and job management.
+ * 
+ * @package RRZE\WebT
+ */
 class RestController extends WP_REST_Controller
 {
     /** @var WebTClient */
@@ -21,11 +26,41 @@ class RestController extends WP_REST_Controller
     /** @var JobStore */
     private $job_store;
 
-    private const TITLE_START   = '<!--RRZE_WEBT_TITLE_START-->';
-    private const TITLE_END     = '<!--RRZE_WEBT_TITLE_END-->';
+    /**
+     * Markers used to delineate title in the translation document.
+     * 
+     * @var string
+     */
+    private const TITLE_START  = '<!--RRZE_WEBT_TITLE_START-->';
+
+    /**
+     * Markers used to delineate title in the translation document.
+     * @var string
+     */
+    private const TITLE_END    = '<!--RRZE_WEBT_TITLE_END-->';
+
+    /**
+     * Markers used to delineate content in the translation document.
+     * 
+     * @var string
+     */
     private const CONTENT_START = '<!--RRZE_WEBT_CONTENT_START-->';
+
+    /**
+     * Markers used to delineate content in the translation document.
+     * 
+     * @var string
+     */
     private const CONTENT_END   = '<!--RRZE_WEBT_CONTENT_END-->';
 
+    /**
+     * Constructor.
+     * 
+     * @param WebTClient $client The WebT client instance.
+     * @param Settings   $settings The settings instance.
+     * @param JobStore   $job_store The job store instance.
+     * @return void
+     */
     public function __construct(WebTClient $client, Settings $settings, JobStore $job_store)
     {
         $this->namespace = 'rrze-webt/v1';
@@ -37,6 +72,11 @@ class RestController extends WP_REST_Controller
         add_action('rest_api_init', [$this, 'register_routes']);
     }
 
+    /**
+     * Register REST API routes.
+     * 
+     * @return void
+     */
     public function register_routes(): void
     {
         register_rest_route(
@@ -89,6 +129,12 @@ class RestController extends WP_REST_Controller
         );
     }
 
+    /**
+     * Check if the current user has permission to perform the requested action.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return bool True if the user has permission, false otherwise.
+     */
     public function check_permissions(WP_REST_Request $request): bool
     {
         $post_id = (int) $request->get_param('post_id');
@@ -100,6 +146,12 @@ class RestController extends WP_REST_Controller
         return current_user_can('edit_posts');
     }
 
+    /**
+     * Handle translation requests.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return WP_REST_Response|WP_Error The response or error.
+     */
     public function handle_translate_request(WP_REST_Request $request)
     {
         $content         = (string) $request->get_param('content');
@@ -182,6 +234,11 @@ class RestController extends WP_REST_Controller
         );
     }
 
+    /**
+     * Get the endpoint arguments for the translate route.
+     * 
+     * @return array The endpoint arguments.
+     */
     private function get_endpoint_args(): array
     {
         return [
@@ -216,6 +273,12 @@ class RestController extends WP_REST_Controller
         ];
     }
 
+    /**
+     * Handle requests to get translation jobs for a specific post.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return WP_REST_Response The response containing the jobs.
+     */
     public function handle_get_jobs(WP_REST_Request $request)
     {
         $post_id = (int) $request->get_param('post_id');
@@ -247,6 +310,12 @@ class RestController extends WP_REST_Controller
         );
     }
 
+    /**
+     * Handle requests to acknowledge a job.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return WP_REST_Response The response indicating the job was acknowledged.
+     */
     public function handle_ack_job(WP_REST_Request $request)
     {
         $token = (string) $request->get_param('token');
@@ -269,6 +338,12 @@ class RestController extends WP_REST_Controller
         );
     }
 
+    /**
+     * Handle callback requests from the WEB-T service.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return WP_REST_Response The response indicating the callback was processed.
+     */
     public function handle_callback(WP_REST_Request $request)
     {
         $token  = (string) $request->get_param('token');
@@ -308,6 +383,12 @@ class RestController extends WP_REST_Controller
         return new WP_REST_Response(['status' => 'stored'], 200);
     }
 
+    /**
+     * Check if the current user has permission to acknowledge the job.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return bool True if the user has permission, false otherwise.
+     */
     private function check_ack_permissions(WP_REST_Request $request): bool
     {
         $token = (string) $request->get_param('token');
@@ -320,6 +401,12 @@ class RestController extends WP_REST_Controller
         return current_user_can('edit_post', (int) $job['post_id']);
     }
 
+    /**
+     * Sanitize job data for REST response.
+     * 
+     * @param array $job The job data.
+     * @return array The sanitized job data.
+     */
     private function sanitize_job_for_response(array $job): array
     {
         $sanitized = [
@@ -345,6 +432,12 @@ class RestController extends WP_REST_Controller
         return $sanitized;
     }
 
+    /**
+     * Extract error message from the request body.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return string The extracted error message.
+     */
     private function extract_error_message(WP_REST_Request $request): string
     {
         $body = $request->get_body();
@@ -368,6 +461,12 @@ class RestController extends WP_REST_Controller
         return $body;
     }
 
+    /**
+     * Extract translated content from the request body.
+     * 
+     * @param WP_REST_Request $request The current request.
+     * @return array|WP_Error The extracted segments or an error.
+     */
     private function extract_translation_content(WP_REST_Request $request)
     {
         $body         = $request->get_body();
@@ -426,6 +525,13 @@ class RestController extends WP_REST_Controller
         return $this->split_translated_document($body);
     }
 
+    /**
+     * Update the post with the translated content if configured to do so.
+     * 
+     * @param array $job The job metadata stored in the job store.
+     * @param array $segments The translated segments (title, content).
+     * @return void
+     */
     private function maybe_update_post(array $job, array $segments): void
     {
         $post_id = (int) $job['post_id'];
@@ -460,6 +566,12 @@ class RestController extends WP_REST_Controller
         wp_update_post($post_arr);
     }
 
+    /**
+     * Split the translated document into title and content segments.
+     * 
+     * @param string $document The full translated document.
+     * @return array An array with 'title' and 'content' keys.
+     */
     private function split_translated_document(string $document): array
     {
         $title   = $this->extract_segment($document, self::TITLE_START, self::TITLE_END);
@@ -475,6 +587,14 @@ class RestController extends WP_REST_Controller
         ];
     }
 
+    /**
+     * Extract a segment from the document between the specified start and end markers.
+     * 
+     * @param string $document The full document.
+     * @param string $start The start marker.
+     * @param string $end The end marker.
+     * @return string The extracted segment or an empty string if not found.
+     */
     private function extract_segment(string $document, string $start, string $end): string
     {
         $start_pos = strpos($document, $start);
