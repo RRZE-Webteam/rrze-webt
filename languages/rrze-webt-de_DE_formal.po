@@ -4,18 +4,18 @@ msgid ""
 msgstr ""
 "Project-Id-Version: RRZE WEB-T Translator 1.0.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/rrze-webt\n"
-"POT-Creation-Date: 2025-10-14T09:05:06+00:00\n"
-"PO-Revision-Date: 2025-10-14 11:19+0200\n"
+"POT-Creation-Date: 2025-10-15T10:30:02+00:00\n"
+"PO-Revision-Date: 2025-10-15 12:32+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: de_DE@formal\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 3.7\n"
+"X-Generator: Poedit 3.8\n"
 "X-Domain: rrze-webt\n"
 
-# #. Plugin Name of the plugin
+#. Plugin Name of the plugin
 #: rrze-webt.php
 msgid "RRZE WEB-T Translator"
 msgstr "RRZE WEB-T Übersetzer"
@@ -44,27 +44,27 @@ msgstr "RRZE-Webteam"
 msgid "https://blogs.fau.de/webworking/"
 msgstr "https://blogs.fau.de/webworking/"
 
-#: includes/EditorAssets.php:57 build/editor.js:1 src/editor.js:30
+#: includes/EditorAssets.php:95 build/editor.js:1 src/editor.js:41
 msgid "WEB-T Translation"
 msgstr "WEB-T-Übersetzung"
 
-#: includes/EditorAssets.php:58 build/editor.js:1 src/editor.js:525
+#: includes/EditorAssets.php:96 build/editor.js:1 src/editor.js:818
 msgid "Translate content"
 msgstr "Inhalte übersetzen"
 
-#: includes/EditorAssets.php:59 build/editor.js:1 src/editor.js:513
+#: includes/EditorAssets.php:97 build/editor.js:1 src/editor.js:798
 msgid "Target language"
 msgstr "Zielsprache"
 
-#: includes/EditorAssets.php:60 build/editor.js:1 src/editor.js:501
+#: includes/EditorAssets.php:98 build/editor.js:1 src/editor.js:778
 msgid "Source language"
 msgstr "Ausgangssprache"
 
-#: includes/EditorAssets.php:61 build/editor.js:1 src/editor.js:320
+#: includes/EditorAssets.php:99 build/editor.js:1 src/editor.js:424
 msgid "Auto detect"
 msgstr "Automatizierte Erkennung"
 
-#: includes/EditorAssets.php:62 build/editor.js:1 src/editor.js:493
+#: includes/EditorAssets.php:100 build/editor.js:1 src/editor.js:757
 msgid ""
 "Please provide the WEB-T application name and password to enable "
 "translations."
@@ -72,21 +72,21 @@ msgstr ""
 "Bitte geben Sie den Namen und das Passwort der WEB-T-Anwendung an, um "
 "Übersetzungen zu ermöglichen."
 
-#: includes/EditorAssets.php:63 build/editor.js:1 src/editor.js:525
+#: includes/EditorAssets.php:101 build/editor.js:1 src/editor.js:815
 msgid "Translating…"
 msgstr "Übersetzen…"
 
-#: includes/EditorAssets.php:64
+#: includes/EditorAssets.php:102
 msgid "Content translated with WEB-T."
 msgstr "Mit WEB-T übersetzte Inhalte."
 
-#: includes/EditorAssets.php:65
+#: includes/EditorAssets.php:103
 msgid "Translation failed. Check the console for details."
 msgstr ""
 "Die Übersetzung ist fehlgeschlagen. Weitere Informationen finden Sie in der "
 "Konsole."
 
-#: includes/EditorAssets.php:66 build/editor.js:1 src/editor.js:91
+#: includes/EditorAssets.php:104 build/editor.js:1 src/editor.js:109
 msgid ""
 "Translation request submitted. The translated content will appear "
 "automatically once ready."
@@ -94,136 +94,146 @@ msgstr ""
 "Übersetzungsanfrage eingereicht. Der übersetzte Inhalt wird automatisch "
 "angezeigt, sobald er fertig ist."
 
-#: includes/EditorAssets.php:67 build/editor.js:1 src/editor.js:92
+#: includes/EditorAssets.php:105 build/editor.js:1 src/editor.js:116
 msgid "The translation service reported a failure."
 msgstr "Der Übersetzungsdienst hat einen Fehler gemeldet."
 
-#: includes/EditorAssets.php:68 includes/EditorAssets.php:75
-#: includes/JobStore.php:90 build/editor.js:1 src/editor.js:93
-#: src/editor.js:102
+#: includes/EditorAssets.php:106 includes/EditorAssets.php:113
+#: includes/JobStore.php:89 build/editor.js:1 src/editor.js:120
+#: src/editor.js:147
 msgid "Translation received from WEB-T."
 msgstr "Übersetzung von WEB-T."
 
-#: includes/EditorAssets.php:69 build/editor.js:1 src/editor.js:94
+#: includes/EditorAssets.php:107 build/editor.js:1 src/editor.js:124
 msgid "Translation jobs"
 msgstr "Übersetzungsaufträge"
 
-#: includes/EditorAssets.php:70 build/editor.js:1 src/editor.js:96
+#: includes/EditorAssets.php:108 build/editor.js:1 src/editor.js:127
 msgid "Pending"
 msgstr "Ausstehend"
 
-#: includes/EditorAssets.php:71 build/editor.js:1 src/editor.js:97
+#: includes/EditorAssets.php:109 build/editor.js:1 src/editor.js:128
 msgid "Failed"
 msgstr "Fehlgeschlagen"
 
-#: includes/EditorAssets.php:72 build/editor.js:1 src/editor.js:98
+#: includes/EditorAssets.php:110 build/editor.js:1 src/editor.js:131
 msgid "Completed"
 msgstr "Abgeschlossen"
 
-#: includes/EditorAssets.php:73 build/editor.js:1 src/editor.js:100
+#: includes/EditorAssets.php:111 build/editor.js:1 src/editor.js:136
 msgid "No details available."
 msgstr "Keine Details verfügbar."
 
-#: includes/EditorAssets.php:74 includes/JobStore.php:38 build/editor.js:1
-#: src/editor.js:101
+#: includes/EditorAssets.php:112 includes/JobStore.php:38 build/editor.js:1
+#: src/editor.js:140
 msgid "Waiting for WEB-T to process this translation request."
 msgstr "Warten darauf, dass WEB-T diese Übersetzungsanforderung verarbeitet."
 
-#: includes/EditorAssets.php:76 build/editor.js:1 src/editor.js:103
+#: includes/EditorAssets.php:114 build/editor.js:1 src/editor.js:151
 msgid "WEB-T request ID:"
 msgstr "WEB-T-Anforderungs-ID:"
 
-#: includes/EditorAssets.php:77 build/editor.js:1 src/editor.js:104
+#: includes/EditorAssets.php:115 build/editor.js:1 src/editor.js:155
 msgid "Client token:"
 msgstr "Client-Token:"
 
-#: includes/EditorAssets.php:78 build/editor.js:1 src/editor.js:105
+#: includes/EditorAssets.php:116 build/editor.js:1 src/editor.js:159
 msgid "Submitted:"
 msgstr "Eingereicht:"
 
-#: includes/EditorAssets.php:79 build/editor.js:1 src/editor.js:106
+#: includes/EditorAssets.php:117 build/editor.js:1 src/editor.js:163
 msgid "Updated:"
 msgstr "Aktualisiert:"
 
-#: includes/EditorAssets.php:80 build/editor.js:1 src/editor.js:107
+#: includes/EditorAssets.php:118 build/editor.js:1 src/editor.js:167
 msgid "Elapsed:"
-msgstr "Geçen:"
+msgstr "Verstrichen:"
 
 #. translators: %s: number of minutes.
-#: includes/EditorAssets.php:82 build/editor.js:1 src/editor.js:109
+#: includes/EditorAssets.php:120 build/editor.js:1 src/editor.js:175
 #, php-format
 msgid "%s minutes"
 msgstr "%s Minuten"
 
 #. translators: %s: number of seconds.
-#: includes/EditorAssets.php:84 build/editor.js:1 src/editor.js:108
+#: includes/EditorAssets.php:122 build/editor.js:1 src/editor.js:171
 #, php-format
 msgid "%s seconds"
 msgstr "%s Sekunden"
 
 #. translators: %s: number of hours.
-#: includes/EditorAssets.php:86 build/editor.js:1 src/editor.js:110
+#: includes/EditorAssets.php:124 build/editor.js:1 src/editor.js:179
 #, php-format
 msgid "%s hours"
 msgstr "%s Stunden"
 
-#: includes/EditorAssets.php:87 build/editor.js:1 src/editor.js:111
+#: includes/EditorAssets.php:125 build/editor.js:1 src/editor.js:183
 msgid "Translated title:"
 msgstr "Übersetzter Titel:"
 
-#: includes/EditorAssets.php:88 build/editor.js:1 src/editor.js:112
+#: includes/EditorAssets.php:126 build/editor.js:1 src/editor.js:187
 msgid "There are no translation jobs yet."
 msgstr "Es gibt noch keine Übersetzungsaufträge."
 
-#: includes/RestController.php:112
+#: includes/EditorAssets.php:127 build/editor.js:1 src/editor.js:769
+msgid "A translation is in progress. Please wait until it finishes."
+msgstr ""
+"Eine Übersetzung ist in Arbeit. Bitte warten Sie, bis der Vorgang "
+"abgeschlossen ist."
+
+#: includes/RestController.php:118
 msgid "There is no content to translate."
 msgstr "Es gibt keinen Inhalt zu übersetzen."
 
-#: includes/RestController.php:116
+#: includes/RestController.php:122
 msgid "The selected target language is not allowed."
 msgstr "Die ausgewählte Zielsprache ist nicht erlaubt."
 
-#: includes/RestController.php:158
+#: includes/RestController.php:166
 msgid "The translation request was submitted to WEB-T."
 msgstr "Die Übersetzungsanfrage wurde an WEB-T übermittelt."
 
-#: includes/RestController.php:180
+#: includes/RestController.php:189
 msgid "The raw post content to translate."
 msgstr "Der Rohinhalt des Posts, der übersetzt werden soll."
 
-#: includes/RestController.php:185
+#: includes/RestController.php:194
 msgid "The target language code."
 msgstr "Der Code der Zielsprache."
 
-#: includes/RestController.php:190
+#: includes/RestController.php:199
 msgid "Optional source language code."
 msgstr "Optionaler Code in der Quellsprache."
 
-#: includes/RestController.php:196
+#: includes/RestController.php:205
 msgid "The current post ID to validate permissions."
 msgstr "Die aktuelle Beitrags-ID zum Überprüfen von Berechtigungen."
 
-#: includes/RestController.php:202
+#: includes/RestController.php:211
 msgid "The post title to translate."
 msgstr "Der Titel des zu übersetzenden Beitrags."
 
-#: includes/RestController.php:323
+#: includes/RestController.php:236
+msgid "Timed out waiting for WEB-T response."
+msgstr "Zeitüberschreitung beim Warten auf die WEB-T-Antwort."
+
+#: includes/RestController.php:353
 msgid "The WEB-T service reported an unspecified error."
 msgstr "Der WEB-T-Dienst hat einen nicht näher bezeichneten Fehler gemeldet."
 
-#: includes/RestController.php:349
+#: includes/RestController.php:380
 msgid "WEB-T callback payload is not valid JSON."
 msgstr "Die WEB-T-Callback-Nutzlast ist kein gültiges JSON."
 
-#: includes/RestController.php:358
+#: includes/RestController.php:389
 msgid "WEB-T callback payload is missing the translated content."
 msgstr "In der WEB-T-Callback-Payload fehlt der übersetzte Inhalt."
 
-#: includes/RestController.php:364
+#: includes/RestController.php:395
 msgid "WEB-T callback content is not valid base64."
 msgstr "WEB-T-Callback-Inhalte sind nicht gültig, Base64."
 
-#: includes/RestController.php:386
+#: includes/RestController.php:417
 msgid "WEB-T callback did not include any content."
 msgstr "Der WEB-T-Callback enthielt keinen Inhalt."
 
@@ -243,7 +253,7 @@ msgstr "Anwendungsname"
 msgid "Password"
 msgstr "Passwort"
 
-#: includes/Settings.php:52 includes/Settings.php:53 includes/Settings.php:100
+#: includes/Settings.php:52 includes/Settings.php:53 includes/Settings.php:106
 msgid "WEB-T Translator"
 msgstr "WEB-T Übersetzer"
 
@@ -254,81 +264,335 @@ msgstr ""
 "Konfigurieren Sie die Anmeldeinformationen, die für die Kommunikation mit "
 "der WEB-T-Übersetzungs-API verwendet werden."
 
-#: includes/WebTClient.php:91
+#: includes/WebTClient.php:14
+msgid "Source language not specified"
+msgstr "Ausgangssprache nicht angegeben"
+
+#: includes/WebTClient.php:15
+msgid "Invalid source language"
+msgstr "Ungültige Ausgangssprache"
+
+#: includes/WebTClient.php:16
+msgid "Target language(s) not specified"
+msgstr "Zielsprache(n) nicht angegeben"
+
+#: includes/WebTClient.php:17
+msgid "Invalid target language(s)"
+msgstr "Ungültige Zielsprache(n)"
+
+#: includes/WebTClient.php:19
+msgid "Caller information not specified"
+msgstr "Anruferinformationen nicht angegeben"
+
+#: includes/WebTClient.php:20
+msgid "Missing application name"
+msgstr "Anwendungsname fehlt"
+
+#: includes/WebTClient.php:21
+msgid "Application not authorized to access the service"
+msgstr "Anwendung nicht berechtigt, auf den Dienst zuzugreifen"
+
+#: includes/WebTClient.php:22
+msgid "Bad format for ftp address"
+msgstr "Falsches Format für FTP-Adresse"
+
+#: includes/WebTClient.php:23
+msgid "Bad format for sftp address"
+msgstr "Falsches Format für die SFTP-Adresse"
+
+#: includes/WebTClient.php:24
+msgid "Bad format for http address"
+msgstr "Ungültiges Format für HTTP-Adresse"
+
+#: includes/WebTClient.php:25
+msgid "Bad format for email address"
+msgstr "Falsches Format für E-Mail-Adresse"
+
+#: includes/WebTClient.php:26
+msgid ""
+"Translation request must be text type, document path type or document base64 "
+"type and not several at a time"
+msgstr ""
+"Die Übersetzungsanforderung muss vom Typ Text, Dokumentpfad oder Dokument-"
+"Base64 sein und darf nicht mehrere gleichzeitig haben"
+
+#: includes/WebTClient.php:27
+msgid "Language pair not supported by the domain"
+msgstr "Sprachpaar, das von der Domäne nicht unterstützt wird"
+
+#: includes/WebTClient.php:28
+msgid "Username parameter not specified"
+msgstr "Parameter \"Benutzername\" nicht angegeben"
+
+#: includes/WebTClient.php:29
+msgid "Extension invalid compared to the MIME type"
+msgstr "Erweiterung im Vergleich zum MIME-Typ ungültig"
+
+#: includes/WebTClient.php:31
+msgid "Username parameter too long"
+msgstr "Benutzername-Parameter zu lang"
+
+#: includes/WebTClient.php:32
+msgid "Invalid output format"
+msgstr "Ungültiges Ausgabeformat"
+
+#: includes/WebTClient.php:33
+msgid "Institution parameter too long"
+msgstr "Institutionsparameter zu lang"
+
+#: includes/WebTClient.php:34
+msgid "Department number too long"
+msgstr "Abteilungsnummer zu lang"
+
+#: includes/WebTClient.php:35
+msgid "Text to translate too long"
+msgstr "Zu langer Text, der übersetzt werden soll"
+
+#: includes/WebTClient.php:36
+msgid "Too many FTP destinations"
+msgstr "Zu viele FTP-Ziele"
+
+#: includes/WebTClient.php:37
+msgid "Too many SFTP destinations"
+msgstr "Zu viele SFTP-Ziele"
+
+#: includes/WebTClient.php:38
+msgid "Too many HTTP destinations"
+msgstr "Zu viele HTTP-Ziele"
+
+#: includes/WebTClient.php:39
+msgid "Missing destination"
+msgstr "Fehlendes Ziel"
+
+#: includes/WebTClient.php:40
+msgid "Bad requester callback protocol"
+msgstr "Fehlerhaftes Callback-Protokoll des Anforderers"
+
+#: includes/WebTClient.php:41
+msgid "Bad error callback protocol"
+msgstr "Callback-Protokoll für fehlerhafte Fehler"
+
+#: includes/WebTClient.php:42
+msgid "Concurrency quota exceeded"
+msgstr "Gleichzeitigkeitskontingent überschritten"
+
+#: includes/WebTClient.php:43
+msgid "Document format not supported"
+msgstr "Dokumentformat wird nicht unterstützt"
+
+#: includes/WebTClient.php:44
+msgid "Text to translate is empty"
+msgstr "Zu übersetzender Text ist leer"
+
+#: includes/WebTClient.php:45
+msgid "Missing text or document to translate"
+msgstr "Fehlender Text oder fehlendes Dokument zum Übersetzen"
+
+#: includes/WebTClient.php:46
+msgid "Email address too long"
+msgstr "E-Mail-Adresse zu lang"
+
+#: includes/WebTClient.php:47
+msgid "Cannot read stream"
+msgstr "Stream kann nicht gelesen werden"
+
+#: includes/WebTClient.php:48
+msgid "Output format not supported"
+msgstr "Ausgabeformat wird nicht unterstützt"
+
+#: includes/WebTClient.php:49
+msgid "Email destination tag is missing or empty"
+msgstr "E-Mail-Ziel-Tag fehlt oder ist leer"
+
+#: includes/WebTClient.php:50
+msgid "HTTP destination tag is missing or empty"
+msgstr "HTTP-Ziel-Tag fehlt oder ist leer"
+
+#: includes/WebTClient.php:51
+msgid "FTP destination tag is missing or empty"
+msgstr "FTP-Ziel-Tag fehlt oder ist leer"
+
+#: includes/WebTClient.php:52
+msgid "SFTP destination tag is missing or empty"
+msgstr "SFTP-Ziel-Tag fehlt oder ist leer"
+
+#: includes/WebTClient.php:53
+msgid "Document to translate tag is missing or empty"
+msgstr "Das Tag des zu übersetzenden Dokuments fehlt oder ist leer"
+
+#: includes/WebTClient.php:54
+msgid "Format tag is missing or empty"
+msgstr "Format-Tag fehlt oder ist leer"
+
+#: includes/WebTClient.php:55
+msgid "The content is missing or empty"
+msgstr "Der Inhalt fehlt oder ist leer"
+
+#: includes/WebTClient.php:56
+msgid "Source language defined in TMX file differs from request"
+msgstr ""
+"Die in der TMX-Datei definierte Quellsprache unterscheidet sich von der "
+"Anforderung"
+
+#: includes/WebTClient.php:57
+msgid "Source language defined in XLIFF file differs from request"
+msgstr ""
+"Die in der XLIFF-Datei definierte Quellsprache unterscheidet sich von der "
+"Anforderung"
+
+#: includes/WebTClient.php:58
+msgid ""
+"Output format is not available when quality estimate is requested. It should "
+"be blank or 'xslx'"
+msgstr ""
+"Das Ausgabeformat ist nicht verfügbar, wenn eine Qualitätsschätzung "
+"angefordert wird. Es sollte leer oder 'xslx' sein."
+
+#: includes/WebTClient.php:59
+msgid "Quality estimate is not available for text snippet"
+msgstr "Qualitätsschätzung ist für diesen Textausschnitt nicht verfügbar"
+
+#: includes/WebTClient.php:60
+msgid "Document too big (>20Mb)"
+msgstr "Dokument zu groß (>20 MB)"
+
+#: includes/WebTClient.php:61
+msgid "Quality estimation not available"
+msgstr "Qualitätsschätzung nicht verfügbar"
+
+#: includes/WebTClient.php:62
+msgid "Too many segments to translate"
+msgstr "Zu viele Segmente zum Übersetzen"
+
+#: includes/WebTClient.php:63
+msgid "Cannot store notification file at specified FTP address"
+msgstr ""
+"Benachrichtigungsdatei kann unter der angegebenen FTP-Adresse nicht "
+"gespeichert werden"
+
+#: includes/WebTClient.php:64
+msgid "Cannot store notification file at specified SFTP address"
+msgstr ""
+"Benachrichtigungsdatei kann unter der angegebenen SFTP-Adresse nicht "
+"gespeichert werden"
+
+#: includes/WebTClient.php:65
+msgid "Cannot store translated file at specified FTP address"
+msgstr ""
+"Übersetzte Datei kann unter der angegebenen FTP-Adresse nicht gespeichert "
+"werden"
+
+#: includes/WebTClient.php:66
+msgid "Cannot store translated file at specified SFTP address"
+msgstr ""
+"Übersetzte Datei kann unter der angegebenen SFTP-Adresse nicht gespeichert "
+"werden"
+
+#: includes/WebTClient.php:67
+msgid "Cannot connect to FTP"
+msgstr "Keine Verbindung zu FTP möglich"
+
+#: includes/WebTClient.php:68
+msgid "Cannot retrieve file at specified FTP address"
+msgstr "Datei unter der angegebenen FTP-Adresse kann nicht abgerufen werden"
+
+#: includes/WebTClient.php:69
+msgid "File not found at specified address on FTP"
+msgstr "Datei an der angegebenen Adresse auf FTP nicht gefunden"
+
+#: includes/WebTClient.php:70
+msgid "Malformed FTP address"
+msgstr "Falsch formatierte FTP-Adresse"
+
+#: includes/WebTClient.php:71 includes/WebTClient.php:74
+msgid "Cannot retrieve file content on SFTP"
+msgstr "Dateiinhalt auf SFTP kann nicht abgerufen werden"
+
+#: includes/WebTClient.php:72
+msgid "Cannot connect to SFTP"
+msgstr "Keine Verbindung zu SFTP möglich"
+
+#: includes/WebTClient.php:73
+msgid "Cannot store file at specified FTP address"
+msgstr "Datei kann nicht unter der angegebenen FTP-Adresse gespeichert werden"
+
+#: includes/WebTClient.php:75
+msgid "Cannot retrieve file at specified SFTP address"
+msgstr "Datei unter der angegebenen SFTP-Adresse kann nicht abgerufen werden"
+
+#: includes/WebTClient.php:98
 msgid "Please configure the WEB-T application name and password first."
 msgstr ""
 "Bitte konfigurieren Sie zuerst den Namen und das Passwort der WEB-T-"
 "Anwendung."
 
 #. translators: %1$d: HTTP status code, %2$s: response body
-#: includes/WebTClient.php:209
+#: includes/WebTClient.php:219
 #, php-format
 msgid "The WEB-T API returned an unexpected status code (%1$d): %2$s"
 msgstr ""
 "Die WEB-T-API hat einen unerwarteten Statuscode (%1$d) zurückgegeben: %2$s"
 
-#: includes/WebTClient.php:243 includes/WebTClient.php:275
+#: includes/WebTClient.php:253 includes/WebTClient.php:285
 msgid "The WEB-T service rejected the translation request."
 msgstr "Der WEB-T-Dienst hat die Übersetzungsanforderung abgelehnt."
 
-#: includes/WebTClient.php:284
+#: includes/WebTClient.php:294
 msgid "The WEB-T API reported an error."
 msgstr "Die WEB-T-API hat einen Fehler gemeldet."
 
-#: includes/WebTClient.php:290
+#: includes/WebTClient.php:300
 msgid "The WEB-T API returned an invalid response."
 msgstr "Die WEB-T-API hat eine ungültige Antwort zurückgegeben."
 
-#: includes/WebTClient.php:338
+#: includes/WebTClient.php:349
 msgid "The WEB-T API response did not include a translation."
 msgstr "Die WEB-T-API-Antwort enthielt keine Übersetzung."
 
-#: includes/WebTClient.php:495
+#: includes/WebTClient.php:515
 msgid "Unable to obtain the authentication challenge from the WEB-T service."
 msgstr ""
 "Die Authentifizierungsabfrage vom WEB-T-Dienst kann nicht abgerufen werden."
 
-#: includes/WebTClient.php:512
+#: includes/WebTClient.php:533
 msgid "The WEB-T service returned an invalid authentication challenge."
 msgstr ""
 "Der WEB-T-Dienst hat eine ungültige Authentifizierungsaufforderung "
 "zurückgegeben."
 
-#: includes/WebTClient.php:614
+#: includes/WebTClient.php:639
 msgid "Empty response from the WEB-T service."
 msgstr "Leere Antwort vom WEB-T-Dienst."
 
-#: build/editor.js:1 src/editor.js:333
+#: build/editor.js:1 src/editor.js:443
 msgid "Fetching translation jobs…"
 msgstr "Übersetzungsaufträge werden abgerufen…"
 
-#: build/editor.js:1 src/editor.js:498
-msgid "A translation is in progress. Please wait until it finishes."
-msgstr ""
-"Eine Übersetzung ist in Arbeit. Bitte warten Sie, bis der Vorgang "
-"abgeschlossen ist."
-
-#: build/editor.js:1 src/editor.js:411
+#: build/editor.js:1 src/editor.js:614
 msgid "Please configure the WEB-T application name and password."
 msgstr ""
 "Bitte konfigurieren Sie den Namen und das Kennwort der WEB-T-Anwendung."
 
-#: build/editor.js:1 src/editor.js:419
+#: build/editor.js:1 src/editor.js:630
 msgid "Nothing to translate. Add content first."
 msgstr "Nichts zu übersetzen. Fügen Sie zuerst Inhalte hinzu."
 
-#: build/editor.js:1 src/editor.js:461
+#: build/editor.js:1 src/editor.js:689
 msgid "Content translated successfully."
 msgstr "Der Inhalt wurde erfolgreich übersetzt."
 
-#: build/editor.js:1 src/editor.js:472 src/editor.js:476
+#: build/editor.js:1 src/editor.js:709 src/editor.js:728
 msgid "Translation failed."
 msgstr "Die Übersetzung ist fehlgeschlagen."
 
-#: src/editor.js:359
+#: build/editor.js:1 src/editor.js:720
+msgid "Request cancelled due to client-side timeout."
+msgstr "Anfrage aufgrund eines Client-seitigen Timeouts abgebrochen."
+
+#: src/editor.js:486
 msgid "Hide details"
 msgstr "Details ausblenden"
 
-#: src/editor.js:359
+#: src/editor.js:487
 msgid "Show details"
 msgstr "Details anzeigen"
