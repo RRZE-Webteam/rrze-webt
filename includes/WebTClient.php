@@ -6,8 +6,50 @@ defined('ABSPATH') || exit;
 
 use WP_Error;
 
+/**
+ * Client class for interacting with the WEB-T translation API.
+ * 
+ * @package RRZE\WebT
+ */
 class WebTClient
 {
+    /**
+     * Markers used to delineate title in the translation document.
+     * 
+     * @var string
+     */
+    private const TITLE_START  = '<!--RRZE_WEBT_TITLE_START-->';
+
+    /**
+     * Markers used to delineate title in the translation document.
+     * @var string
+     */
+    private const TITLE_END    = '<!--RRZE_WEBT_TITLE_END-->';
+
+    /**
+     * Markers used to delineate content in the translation document.
+     * 
+     * @var string
+     */
+    private const CONTENT_START = '<!--RRZE_WEBT_CONTENT_START-->';
+
+    /**
+     * Markers used to delineate content in the translation document.
+     * 
+     * @var string
+     */
+    private const CONTENT_END   = '<!--RRZE_WEBT_CONTENT_END-->';
+
+    /**
+     * @var Settings
+     */
+    private $settings;
+
+    /**
+     * Get the error map for WEB-T error codes.
+     * 
+     * @return array<int, string> Associative array mapping error codes to messages.
+     */
     private static function get_error_map(): array
     {
         return [
@@ -76,21 +118,28 @@ class WebTClient
         ];
     }
 
-    /** @var Settings */
-    private $settings;
-
+    /**
+     * Constructor.
+     * 
+     * @param Settings $settings Settings instance for configuration and credentials.
+     * @return void
+     */
     public function __construct(Settings $settings)
     {
         $this->settings = $settings;
     }
 
-    private const TITLE_START  = '<!--RRZE_WEBT_TITLE_START-->';
-    private const TITLE_END    = '<!--RRZE_WEBT_TITLE_END-->';
-    private const CONTENT_START = '<!--RRZE_WEBT_CONTENT_START-->';
-    private const CONTENT_END   = '<!--RRZE_WEBT_CONTENT_END-->';
-
     /**
      * Sends the content to the WEB-T API and either returns the translation or queues a job.
+     * 
+     * @param string $content         The content to translate (HTML).
+     * @param string $target_language The target language code (e.g. "EN").
+     * @param string $source_language The source language code (e.g. "DE") or empty for auto-detect.
+     * @param int    $post_id         The related post ID (for logging and filters).
+     * @param array  $callbacks       Optional associative array with 'success' and 'error' callback URLs.
+     * @param string $client_token    Optional client token to associate with the request.
+     * @param string $title          Optional title to translate (if different from post title).
+     * @return array|string|WP_Error Array with 'title' and 'content' keys on success, WP_Error on failure, or WP_Error with 'rrze_webt_async_job' code for queued jobs.
      */
     public function translate(string $content, string $target_language, string $source_language = '', int $post_id = 0, array $callbacks = [], string $client_token = '', string $title = '')
     {
@@ -320,6 +369,12 @@ class WebTClient
         return apply_filters('rrze_webt_translation_result', $segments, $data);
     }
 
+    /**
+     * Extracts the translation text from the API response data.
+     * 
+     * @param array $data The decoded API response data.
+     * @return string|WP_Error The extracted translation text, or WP_Error if not found
+     */
     private function extract_translation_document(array $data)
     {
         $keys = ['translation', 'translatedText', 'result'];
@@ -349,6 +404,12 @@ class WebTClient
         return new WP_Error('rrze_webt_missing_translation', __('The WEB-T API response did not include a translation.', 'rrze-webt'), ['response' => $data]);
     }
 
+    /**
+     * Resolves the url of the translate endpoint based on the base API URL.
+     * 
+     * @param string $endpoint The base API URL.
+     * @return string The full URL of the translate endpoint.
+     */
     private function resolve_translate_endpoint(string $endpoint): string
     {
         if ('' === $endpoint) {
@@ -362,6 +423,12 @@ class WebTClient
         return trailingslashit($endpoint) . 'translate';
     }
 
+    /**
+     * Normalizes a language code to the format "XX" or "XX-YY".
+     * 
+     * @param string $code The input language code.
+     * @return string The normalized language code, or empty string if invalid.
+     */
     private function normalize_language_code(string $code): string
     {
         $code = preg_replace('/[^a-zA-Z\-_]/', '', $code);
@@ -378,6 +445,12 @@ class WebTClient
         return $region ? $language . '-' . $region : $language;
     }
 
+    /**
+     * Reduces a language code to its primary subtag (e.g. "EN" from "EN-GB").
+     * 
+     * @param string $code The input language code.
+     * @return string The reduced language code, or empty string if input is empty.
+     */
     private function reduce_language_code(string $code): string
     {
         if ('' === $code) {
@@ -389,11 +462,24 @@ class WebTClient
         return strtoupper($parts[0] ?? $code);
     }
 
+    /**
+     * Composes a translation document with title and content markers.
+     * 
+     * @param string $title   The title to include.
+     * @param string $content The content to include.
+     * @return string The composed translation document.
+     */
     private function compose_translation_document(string $title, string $content): string
     {
         return self::TITLE_START . (string) $title . self::TITLE_END . self::CONTENT_START . (string) $content . self::CONTENT_END;
     }
 
+    /**
+     * Splits a translated document into title and content segments.
+     * 
+     * @param string $document The translated document containing markers.
+     * @return array Associative array with 'title' and 'content' keys.
+     */
     private function split_translated_document(string $document): array
     {
         $title   = $this->extract_segment($document, self::TITLE_START, self::TITLE_END);
@@ -409,6 +495,14 @@ class WebTClient
         ];
     }
 
+    /**
+     * Extracts a segment from the document between start and end markers.
+     * 
+     * @param string $document The full document text.
+     * @param string $start    The start marker.
+     * @param string $end      The end marker.
+     * @return string The extracted segment, or empty string if not found.
+     */
     private function extract_segment(string $document, string $start, string $end): string
     {
         $start_pos = strpos($document, $start);
@@ -423,6 +517,12 @@ class WebTClient
         return trim($segment);
     }
 
+    /**
+     * Determines the source language code based on input or site locale.
+     * 
+     * @param string $source_language The provided source language code (may be empty).
+     * @return string The determined source language code, or empty string if undetermined.
+     */
     private function determine_source_language(string $source_language): string
     {
         $source_language = trim($source_language);
@@ -445,6 +545,15 @@ class WebTClient
         return $normalized;
     }
 
+    /**
+     * Dispatches an HTTP request with Digest authentication.
+     * 
+     * @param string $url      The request URL.
+     * @param array  $args     The request arguments (method, headers, body, etc.).
+     * @param string $username The username for authentication.
+     * @param string $password The password for authentication.
+     * @return array|WP_Error The response array on success, or WP_Error on failure
+     */
     private function dispatch_request_with_digest(string $url, array $args, string $username, string $password)
     {
         $method = strtoupper($args['method'] ?? 'POST');
@@ -476,6 +585,14 @@ class WebTClient
         return wp_remote_request($url, $args);
     }
 
+    /**
+     * Acquires the Digest authentication challenge from the server.
+     * 
+     * @param string $url    The request URL.
+     * @param string $method The HTTP method (e.g. "POST").
+     * @param array  $args   The original request arguments (for timeout, sslverify, etc.).
+     * @return array|WP_Error Associative array with 'header' and 'response' keys on success, or WP_Error on failure.
+     */
     private function acquire_digest_challenge(string $url, string $method, array $args)
     {
         $handshake_args = [
@@ -525,6 +642,16 @@ class WebTClient
         ];
     }
 
+    /**
+     * Builds the Digest authentication header value.
+     * 
+     * @param string $header   The 'WWW-Authenticate' header value from the server.
+     * @param string $url      The request URL.
+     * @param string $method   The HTTP method (e.g. "POST").
+     * @param string $username The username for authentication.
+     * @param string $password The password for authentication.
+     * @return string|WP_Error The constructed 'Authorization' header value, or WP_Error on failure.
+     */
     private function build_digest_header(string $header, string $url, string $method, string $username, string $password)
     {
         $challenge = $this->parse_digest_challenge($header);
@@ -586,6 +713,12 @@ class WebTClient
         return rtrim($digest, ', ');
     }
 
+    /**
+     * Parses the Digest authentication challenge header into its components.
+     * 
+     * @param string $header The 'WWW-Authenticate' header value.
+     * @return array Associative array of challenge parameters.
+     */
     private function parse_digest_challenge(string $header): array
     {
         $header = trim($header);
@@ -608,6 +741,12 @@ class WebTClient
         return $challenge;
     }
 
+    /**
+     * Normalizes the qop value from the challenge.
+     * 
+     * @param string $qop The qop value from the challenge.
+     * @return string The normalized qop value (e.g. "auth"), or empty string if none.
+     */
     private function normalize_qop(string $qop): string
     {
         if ('' === $qop) {
@@ -618,6 +757,11 @@ class WebTClient
         return $parts[0] ?? '';
     }
 
+    /**
+     * Generates a client nonce (cnonce) for Digest authentication.
+     * 
+     * @return string The generated cnonce value.
+     */
     private function generate_cnonce(): string
     {
         if (function_exists('wp_generate_uuid4')) {
@@ -627,6 +771,12 @@ class WebTClient
         return md5(uniqid((string) mt_rand(), true));
     }
 
+    /**
+     * Describes an API error based on the response body.
+     * 
+     * @param mixed $body The response body (string or array).
+     * @return string A human-readable error message.
+     */
     private function describe_api_error($body): string
     {
         if (is_array($body)) {
@@ -673,6 +823,12 @@ class WebTClient
         return $trimmed;
     }
 
+    /**
+     * Looks up a human-readable error message for a given error code.
+     * 
+     * @param int $code The error code to look up.
+     * @return string|null The corresponding error message, or null if not found or deprecated.
+     */
     private function lookup_error_message(int $code): ?string
     {
         $map     = self::get_error_map();
