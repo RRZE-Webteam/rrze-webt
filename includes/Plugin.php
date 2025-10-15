@@ -1,9 +1,16 @@
 <?php
+
 namespace RRZE\WebT;
 
 defined('ABSPATH') || exit;
 
-final class Plugin {
+/**
+ * Main plugin class implementing the singleton pattern.
+ * 
+ * @package RRZE\WebT
+ */
+final class Plugin
+{
     /** @var Plugin|null */
     private static $instance = null;
 
@@ -22,31 +29,61 @@ final class Plugin {
     /** @var JobStore */
     private $job_store;
 
-    private function __construct() {
+    /**
+     * Private constructor to enforce singleton pattern.
+     * 
+     * @return void
+     */
+    private function __construct()
+    {
         $this->settings        = new Settings();
-        $this->client          = new WebTClient( $this->settings );
+        $this->client          = new WebTClient($this->settings);
         $this->job_store       = new JobStore();
-        $this->rest_controller = new RestController( $this->client, $this->settings, $this->job_store );
-        $this->editor_assets   = new EditorAssets( $this->settings );
+        $this->rest_controller = new RestController($this->client, $this->settings, $this->job_store);
+        $this->editor_assets   = new EditorAssets($this->settings);
     }
 
-    public static function init(): Plugin {
-        if ( null === self::$instance ) {
+    /**
+     * Get the singleton instance of the Plugin.
+     * 
+     * @return Plugin The singleton instance.
+     */
+    public static function init(): Plugin
+    {
+        if (null === self::$instance) {
             self::$instance = new self();
         }
 
         return self::$instance;
     }
 
-    public function get_settings(): Settings {
+    /**
+     * Get the settings instance.
+     * 
+     * @return Settings Settings instance.
+     */
+    public function get_settings(): Settings
+    {
         return $this->settings;
     }
 
-    public function get_client(): WebTClient {
+    /**
+     * Get the WebT client instance.
+     * 
+     * @return WebTClient WebT client instance.
+     */
+    public function get_client(): WebTClient
+    {
         return $this->client;
     }
 
-    public function get_job_store(): JobStore {
+    /**
+     * Get the JobStore instance.
+     * 
+     * @return JobStore JobStore instance.
+     */
+    public function get_job_store(): JobStore
+    {
         return $this->job_store;
     }
 }
