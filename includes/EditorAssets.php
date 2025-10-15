@@ -46,7 +46,7 @@ class EditorAssets
         }
 
         $deps    = ['wp-plugins', 'wp-edit-post', 'wp-components', 'wp-element', 'wp-i18n', 'wp-data', 'wp-api-fetch', 'wp-notices'];
-        $version = defined('RRZE_WEBT_VERSION') ? RRZE_WEBT_VERSION : (string) (filemtime($script_path) ?: time());
+        $version = (string) (filemtime($script_path) ?: time());
 
         if (file_exists($asset_path)) {
             $asset = include $asset_path;
@@ -67,7 +67,7 @@ class EditorAssets
         }
 
         if (file_exists($style_path)) {
-            $style_version = defined('RRZE_WEBT_VERSION') ? RRZE_WEBT_VERSION : (string) (filemtime($style_path) ?: time());
+            $style_version = (string) (filemtime($style_path) ?: time());
             wp_enqueue_style($handle, $style_url, [], $style_version);
         }
 
