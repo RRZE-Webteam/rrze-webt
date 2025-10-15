@@ -1,167 +1,263 @@
 <?php
+
 namespace RRZE\WebT;
 
 defined('ABSPATH') || exit;
 
-class Settings {
+/**
+ * Settings class for managing plugin configuration and credentials.
+ * 
+ * @package RRZE\WebT
+ */
+class Settings
+{
+    /**
+     * Option name used to store settings in the WordPress options table.
+     * 
+     * @var string
+     */
     private const OPTION_NAME = 'rrze_webt_settings';
 
-    public function __construct() {
-        add_action( 'admin_init', [ $this, 'register_settings' ] );
-        add_action( 'admin_menu', [ $this, 'register_menu_page' ] );
+    /**
+     * Constructor that hooks into WordPress admin actions.
+     * 
+     * @return void
+     */
+    public function __construct()
+    {
+        add_action('admin_init', [$this, 'register_settings']);
+        add_action('admin_menu', [$this, 'register_menu_page']);
     }
 
-    public function register_settings(): void {
-        register_setting( 'rrze_webt', self::OPTION_NAME, [ $this, 'sanitize_settings' ] );
+    /**
+     * Registers settings, sections, and fields for the plugin settings page.
+     * 
+     * @return void
+     */
+    public function register_settings(): void
+    {
+        register_setting('rrze_webt', self::OPTION_NAME, [$this, 'sanitize_settings']);
 
         add_settings_section(
             'rrze_webt_main',
-            __( 'WEB-T API Settings', 'rrze-webt' ),
-            [ $this, 'render_settings_section_intro' ],
+            __('WEB-T API Settings', 'rrze-webt'),
+            [$this, 'render_settings_section_intro'],
             'rrze_webt'
         );
 
         add_settings_field(
             'rrze_webt_api_url',
-            __( 'API Endpoint URL', 'rrze-webt' ),
-            [ $this, 'render_api_url_field' ],
+            __('API Endpoint URL', 'rrze-webt'),
+            [$this, 'render_api_url_field'],
             'rrze_webt',
             'rrze_webt_main'
         );
 
         add_settings_field(
             'rrze_webt_application_name',
-            __( 'Application Name', 'rrze-webt' ),
-            [ $this, 'render_application_name_field' ],
+            __('Application Name', 'rrze-webt'),
+            [$this, 'render_application_name_field'],
             'rrze_webt',
             'rrze_webt_main'
         );
 
         add_settings_field(
             'rrze_webt_password',
-            __( 'Password', 'rrze-webt' ),
-            [ $this, 'render_password_field' ],
+            __('Password', 'rrze-webt'),
+            [$this, 'render_password_field'],
             'rrze_webt',
             'rrze_webt_main'
         );
-
     }
 
-    public function register_menu_page(): void {
+    /**
+     * Registers the settings page under the "Settings" menu in the WordPress admin.
+     * 
+     * @return void
+     */
+    public function register_menu_page(): void
+    {
         add_options_page(
-            __( 'WEB-T Translator', 'rrze-webt' ),
-            __( 'WEB-T Translator', 'rrze-webt' ),
+            __('WEB-T Translator', 'rrze-webt'),
+            __('WEB-T Translator', 'rrze-webt'),
             'manage_options',
             'rrze-webt',
-            [ $this, 'render_settings_page' ]
+            [$this, 'render_settings_page']
         );
     }
 
-    public function render_settings_section_intro(): void {
-        echo '<p>' . esc_html__( 'Configure the credentials used to communicate with the WEB-T translation API.', 'rrze-webt' ) . '</p>';
+    /**
+     * Renders the introduction text for the settings section.
+     * 
+     * @return void
+     */
+    public function render_settings_section_intro(): void
+    {
+        echo '<p>' . esc_html__('Configure the credentials used to communicate with the WEB-T translation API.', 'rrze-webt') . '</p>';
     }
 
-    public function render_api_url_field(): void {
-        $readonly = $this->is_field_filtered( 'api_url' );
+    /**
+     * Renders the API URL input field.
+     * 
+     * @return void
+     */
+    public function render_api_url_field(): void
+    {
+        $readonly = $this->is_field_filtered('api_url');
         $options  = $this->get_options();
         printf(
             '<input type="text" name="%1$s[api_url]" id="%2$s" value="%3$s" class="regular-text" placeholder="https://api.example.com/translate" %4$s />',
-            esc_attr( self::OPTION_NAME ),
-            esc_attr( 'rrze_webt_api_url' ),
-            esc_attr( $options['api_url'] ),
+            esc_attr(self::OPTION_NAME),
+            esc_attr('rrze_webt_api_url'),
+            esc_attr($options['api_url']),
             $readonly ? 'readonly disabled' : ''
         );
     }
 
-    public function render_application_name_field(): void {
-        $readonly = $this->is_field_filtered( 'application_name' );
+    /**
+     * Renders the Application Name input field.
+     * 
+     * @return void
+     */
+    public function render_application_name_field(): void
+    {
+        $readonly = $this->is_field_filtered('application_name');
         $options  = $this->get_options();
         printf(
             '<input type="text" name="%1$s[application_name]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" %4$s />',
-            esc_attr( self::OPTION_NAME ),
-            esc_attr( 'rrze_webt_application_name' ),
-            esc_attr( $options['application_name'] ),
+            esc_attr(self::OPTION_NAME),
+            esc_attr('rrze_webt_application_name'),
+            esc_attr($options['application_name']),
             $readonly ? 'readonly disabled' : ''
         );
     }
 
-    public function render_password_field(): void {
-        $readonly = $this->is_field_filtered( 'password' );
+    /**
+     * Renders the Password input field.
+     * 
+     * @return void
+     */
+    public function render_password_field(): void
+    {
+        $readonly = $this->is_field_filtered('password');
         $options  = $this->get_options();
         printf(
             '<input type="password" name="%1$s[password]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" %4$s />',
-            esc_attr( self::OPTION_NAME ),
-            esc_attr( 'rrze_webt_password' ),
-            esc_attr( $options['password'] ),
+            esc_attr(self::OPTION_NAME),
+            esc_attr('rrze_webt_password'),
+            esc_attr($options['password']),
             $readonly ? 'readonly disabled' : ''
         );
     }
 
-    public function render_settings_page(): void {
-        if ( ! current_user_can( 'manage_options' ) ) {
+    /**
+     * Renders the settings page HTML.
+     * 
+     * @return void
+     */
+    public function render_settings_page(): void
+    {
+        if (! current_user_can('manage_options')) {
             return;
         }
-        ?>
+?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'WEB-T Translator', 'rrze-webt' ); ?></h1>
+            <h1><?php esc_html_e('WEB-T Translator', 'rrze-webt'); ?></h1>
             <form action="options.php" method="post">
                 <?php
-                settings_fields( 'rrze_webt' );
-                do_settings_sections( 'rrze_webt' );
+                settings_fields('rrze_webt');
+                do_settings_sections('rrze_webt');
                 submit_button();
                 ?>
             </form>
         </div>
-        <?php
+<?php
     }
 
-    public function sanitize_settings( $input ): array {
-        $input    = is_array( $input ) ? $input : [];
+    /**
+     * Sanitizes and validates the settings input before saving.
+     * 
+     * @param mixed $input The input array to sanitize.
+     * @return array The sanitized settings array.
+     */
+    public function sanitize_settings($input): array
+    {
+        $input    = is_array($input) ? $input : [];
         $defaults = $this->get_defaults();
 
         $sanitized = [];
-        $sanitized['api_url'] = $this->is_field_filtered( 'api_url' )
+        $sanitized['api_url'] = $this->is_field_filtered('api_url')
             ? $defaults['api_url']
-            : ( isset( $input['api_url'] ) ? esc_url_raw( trim( $input['api_url'] ) ) : $defaults['api_url'] );
+            : (isset($input['api_url']) ? esc_url_raw(trim($input['api_url'])) : $defaults['api_url']);
 
-        $sanitized['application_name'] = $this->is_field_filtered( 'application_name' )
+        $sanitized['application_name'] = $this->is_field_filtered('application_name')
             ? $defaults['application_name']
-            : ( isset( $input['application_name'] )
-                ? sanitize_text_field( $input['application_name'] )
-                : $defaults['application_name'] );
+            : (isset($input['application_name'])
+                ? sanitize_text_field($input['application_name'])
+                : $defaults['application_name']);
 
-        $sanitized['password'] = $this->is_field_filtered( 'password' )
+        $sanitized['password'] = $this->is_field_filtered('password')
             ? $defaults['password']
-            : ( isset( $input['password'] )
-                ? sanitize_text_field( $input['password'] )
-                : $defaults['password'] );
+            : (isset($input['password'])
+                ? sanitize_text_field($input['password'])
+                : $defaults['password']);
 
         return $sanitized;
     }
 
-    public function get_options(): array {
-        $options = get_option( self::OPTION_NAME, [] );
-        $options = is_array( $options ) ? $options : [];
+    /**
+     * Retrieves the current settings, merging with defaults as needed.
+     * 
+     * @return array The settings array.
+     */
+    public function get_options(): array
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $options = is_array($options) ? $options : [];
 
-        return wp_parse_args( $options, $this->get_defaults() );
+        return wp_parse_args($options, $this->get_defaults());
     }
 
-    public function get_api_url(): string {
+    /**
+     * Gets the configured API URL.
+     * 
+     * @return string The API URL (empty string if not set).
+     */
+    public function get_api_url(): string
+    {
         $options = $this->get_options();
         return $options['api_url'];
     }
 
-    public function get_application_name(): string {
+    /**
+     * Gets the configured Application Name.
+     * 
+     * @return string The Application Name (empty string if not set).
+     */
+    public function get_application_name(): string
+    {
         $options = $this->get_options();
         return $options['application_name'];
     }
 
-    public function get_password(): string {
+    /**
+     * Gets the configured Password.
+     * 
+     * @return string The Password (empty string if not set).
+     */
+    public function get_password(): string
+    {
         $options = $this->get_options();
         return $options['password'];
     }
 
-    public function get_available_languages(): array {
+    /**
+     * Gets the list of available languages based on installed WordPress translations.
+     * 
+     * @return string[] Array of language codes (e.g. ['EN', 'DE']).
+     */
+    public function get_available_languages(): array
+    {
         $languages = $this->gather_wp_languages();
 
         /**
@@ -169,15 +265,21 @@ class Settings {
          *
          * @param string[] $languages Language codes provided from installed WordPress translations.
          */
-        return (array) apply_filters( 'rrze_webt_available_languages', $languages );
+        return (array) apply_filters('rrze_webt_available_languages', $languages);
     }
 
-    public function get_default_target_language(): string {
+    /**
+     * Gets the default target language, which is the first available language different from the site language.
+     * 
+     * @return string The default target language code (e.g. 'EN').
+     */
+    public function get_default_target_language(): string
+    {
         $languages = $this->get_available_languages();
         $source    = $this->get_site_language();
 
-        foreach ( $languages as $language ) {
-            if ( $language !== $source ) {
+        foreach ($languages as $language) {
+            if ($language !== $source) {
                 return $language;
             }
         }
@@ -185,11 +287,23 @@ class Settings {
         return $languages[0] ?? 'EN';
     }
 
-    public function has_valid_credentials(): bool {
-        return (bool) ( $this->get_api_url() && $this->get_application_name() && $this->get_password() );
+    /**
+     * Checks if valid credentials are configured.
+     * 
+     * @return bool True if all required credentials are set, false otherwise.
+     */
+    public function has_valid_credentials(): bool
+    {
+        return (bool) ($this->get_api_url() && $this->get_application_name() && $this->get_password());
     }
 
-    private function get_defaults(): array {
+    /**
+     * Gets the default settings values.
+     * 
+     * @return array Associative array of default settings.
+     */
+    private function get_defaults(): array
+    {
         $defaults = [
             'api_url'          => '',
             'application_name' => '',
@@ -202,84 +316,131 @@ class Settings {
          *
          * @param array $defaults Default credentials values.
          */
-        $limits = apply_filters( 'rrze_webt_credentials', $defaults );
+        $limits = apply_filters('rrze_webt_credentials', $defaults);
 
-        if ( is_array( $limits ) ) {
-            $defaults = array_merge( $defaults, array_intersect_key( $limits, $defaults ) );
+        if (is_array($limits)) {
+            $defaults = array_merge($defaults, array_intersect_key($limits, $defaults));
         }
 
         return $defaults;
     }
 
-    public function is_supported_language( string $language ): bool {
-        $language = $this->sanitize_language_code( $language );
+    /**
+     * Checks if a given language code is supported.
+     * 
+     * @param string $language The language code to check (e.g. 'EN', 'de', 'fr-FR').
+     * @return bool True if the language is supported, false otherwise.
+     */
+    public function is_supported_language(string $language): bool
+    {
+        $language = $this->sanitize_language_code($language);
 
-        if ( '' === $language ) {
+        if ('' === $language) {
             return false;
         }
 
-        return in_array( $language, $this->get_available_languages(), true );
+        return in_array($language, $this->get_available_languages(), true);
     }
 
-    public function get_site_language(): string {
-        return $this->locale_to_language_code( get_locale() );
+    /**
+     * Gets the site's current language code.
+     * 
+     * @return string The site language code (e.g. 'EN', 'de').
+     */
+    public function get_site_language(): string
+    {
+        return $this->locale_to_language_code(get_locale());
     }
 
-    public function normalize_language_code( string $language ): string {
-        return $this->sanitize_language_code( $language );
+    /**
+     * Normalizes a given language code to a standard format.
+     * 
+     * @param string $language The language code to normalize (e.g. 'en', 'DE-de', 'fr_FR').
+     * @return string The normalized language code (e.g. 'EN', 'DE', 'FR').
+     */
+    public function normalize_language_code(string $language): string
+    {
+        return $this->sanitize_language_code($language);
     }
 
-    private function gather_wp_languages(): array {
+    /**
+     * Gathers available languages from installed WordPress translations.
+     * 
+     * @return string[] Array of language codes (e.g. ['EN', 'DE']).
+     */
+    private function gather_wp_languages(): array
+    {
         $locales   = get_available_languages();
         $locales[] = get_locale();
-        $locales   = array_filter( array_unique( $locales ) );
+        $locales   = array_filter(array_unique($locales));
 
         $languages = [];
 
-        foreach ( $locales as $locale ) {
-            $language = $this->locale_to_language_code( $locale );
+        foreach ($locales as $locale) {
+            $language = $this->locale_to_language_code($locale);
 
-            if ( ! $language ) {
+            if (! $language) {
                 continue;
             }
 
-            $base = strtoupper( explode( '-', $language )[0] ?? $language );
+            $base = strtoupper(explode('-', $language)[0] ?? $language);
             $languages[] = $base;
         }
 
-        $languages = array_unique( array_filter( $languages ) );
-        sort( $languages );
+        $languages = array_unique(array_filter($languages));
+        sort($languages);
 
-        return $languages ?: [ 'EN' ];
+        return $languages ?: ['EN'];
     }
 
-    private function locale_to_language_code( string $locale ): string {
-        $locale = preg_replace( '/[^a-zA-Z_\-]/', '', $locale );
-        $locale = str_replace( '_', '-', strtolower( $locale ) );
-        $parts  = array_values( array_filter( explode( '-', $locale ) ) );
+    /**
+     * Converts a locale string to a language code.
+     * 
+     * @param string $locale The locale string (e.g. 'en_US', 'de-DE').
+     * @return string The corresponding language code (e.g. 'EN', 'DE'), or empty string if invalid.
+     */
+    private function locale_to_language_code(string $locale): string
+    {
+        $locale = preg_replace('/[^a-zA-Z_\-]/', '', $locale);
+        $locale = str_replace('_', '-', strtolower($locale));
+        $parts  = array_values(array_filter(explode('-', $locale)));
 
-        if ( empty( $parts ) ) {
+        if (empty($parts)) {
             return '';
         }
 
-        return strtoupper( array_shift( $parts ) );
+        return strtoupper(array_shift($parts));
     }
 
-    private function sanitize_language_code( string $language ): string {
-        $language = preg_replace( '/[^a-zA-Z\-]/', '', $language );
-        $language = str_replace( '_', '-', $language );
-        $parts    = array_values( array_filter( explode( '-', strtolower( $language ) ) ) );
+    /**
+     * Sanitizes a language code by removing invalid characters and normalizing its format.
+     * 
+     * @param string $language The language code to sanitize (e.g. 'en', 'DE-de', 'fr_FR').
+     * @return string The sanitized language code (e.g. 'EN', 'DE', 'FR').
+     */
+    private function sanitize_language_code(string $language): string
+    {
+        $language = preg_replace('/[^a-zA-Z\-]/', '', $language);
+        $language = str_replace('_', '-', $language);
+        $parts    = array_values(array_filter(explode('-', strtolower($language))));
 
-        if ( empty( $parts ) ) {
+        if (empty($parts)) {
             return '';
         }
 
-        return strtoupper( array_shift( $parts ) );
+        return strtoupper(array_shift($parts));
     }
 
-    private function is_field_filtered( string $key ): bool {
-        $filtered = apply_filters( 'rrze_webt_credentials', [] );
+    /**
+     * Checks if a specific field is filtered via the 'rrze_webt_credentials' filter.
+     * 
+     * @param string $key The field key to check (e.g. 'api_url', 'application_name', 'password').
+     * @return bool True if the field is filtered, false otherwise.
+     */
+    private function is_field_filtered(string $key): bool
+    {
+        $filtered = apply_filters('rrze_webt_credentials', []);
 
-        return is_array( $filtered ) && array_key_exists( $key, $filtered ) && '' !== $filtered[ $key ];
+        return is_array($filtered) && array_key_exists($key, $filtered) && '' !== $filtered[$key];
     }
 }
