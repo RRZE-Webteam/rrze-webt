@@ -62,32 +62,38 @@ class Settings {
     }
 
     public function render_api_url_field(): void {
-        $options = $this->get_options();
+        $readonly = $this->is_field_filtered( 'api_url' );
+        $options  = $this->get_options();
         printf(
-            '<input type="text" name="%1$s[api_url]" id="%2$s" value="%3$s" class="regular-text" placeholder="https://api.example.com/translate" />',
+            '<input type="text" name="%1$s[api_url]" id="%2$s" value="%3$s" class="regular-text" placeholder="https://api.example.com/translate" %4$s />',
             esc_attr( self::OPTION_NAME ),
             esc_attr( 'rrze_webt_api_url' ),
-            esc_attr( $options['api_url'] )
+            esc_attr( $options['api_url'] ),
+            $readonly ? 'readonly disabled' : ''
         );
     }
 
     public function render_application_name_field(): void {
-        $options = $this->get_options();
+        $readonly = $this->is_field_filtered( 'application_name' );
+        $options  = $this->get_options();
         printf(
-            '<input type="text" name="%1$s[application_name]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" />',
+            '<input type="text" name="%1$s[application_name]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" %4$s />',
             esc_attr( self::OPTION_NAME ),
             esc_attr( 'rrze_webt_application_name' ),
-            esc_attr( $options['application_name'] )
+            esc_attr( $options['application_name'] ),
+            $readonly ? 'readonly disabled' : ''
         );
     }
 
     public function render_password_field(): void {
-        $options = $this->get_options();
+        $readonly = $this->is_field_filtered( 'password' );
+        $options  = $this->get_options();
         printf(
-            '<input type="password" name="%1$s[password]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" />',
+            '<input type="password" name="%1$s[password]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" %4$s />',
             esc_attr( self::OPTION_NAME ),
             esc_attr( 'rrze_webt_password' ),
-            esc_attr( $options['password'] )
+            esc_attr( $options['password'] ),
+            $readonly ? 'readonly disabled' : ''
         );
     }
 
@@ -114,15 +120,21 @@ class Settings {
         $defaults = $this->get_defaults();
 
         $sanitized = [];
-        $sanitized['api_url'] = isset( $input['api_url'] ) ? esc_url_raw( trim( $input['api_url'] ) ) : $defaults['api_url'];
+        $sanitized['api_url'] = $this->is_field_filtered( 'api_url' )
+            ? $defaults['api_url']
+            : ( isset( $input['api_url'] ) ? esc_url_raw( trim( $input['api_url'] ) ) : $defaults['api_url'] );
 
-        $sanitized['application_name'] = isset( $input['application_name'] )
-            ? sanitize_text_field( $input['application_name'] )
-            : $defaults['application_name'];
+        $sanitized['application_name'] = $this->is_field_filtered( 'application_name' )
+            ? $defaults['application_name']
+            : ( isset( $input['application_name'] )
+                ? sanitize_text_field( $input['application_name'] )
+                : $defaults['application_name'] );
 
-        $sanitized['password'] = isset( $input['password'] )
-            ? sanitize_text_field( $input['password'] )
-            : $defaults['password'];
+        $sanitized['password'] = $this->is_field_filtered( 'password' )
+            ? $defaults['password']
+            : ( isset( $input['password'] )
+                ? sanitize_text_field( $input['password'] )
+                : $defaults['password'] );
 
         return $sanitized;
     }
@@ -178,11 +190,25 @@ class Settings {
     }
 
     private function get_defaults(): array {
-        return [
-            'api_url'                  => '',
-            'application_name'         => '',
-            'password'                 => '',
+        $defaults = [
+            'api_url'          => '',
+            'application_name' => '',
+            'password'         => '',
         ];
+
+        /**
+         * Allow other plugins/themes to override WEB-T credentials.
+         * Should return an associative array with keys matching the defaults.
+         *
+         * @param array $defaults Default credentials values.
+         */
+        $limits = apply_filters( 'rrze_webt_credentials', $defaults );
+
+        if ( is_array( $limits ) ) {
+            $defaults = array_merge( $defaults, array_intersect_key( $limits, $defaults ) );
+        }
+
+        return $defaults;
     }
 
     public function is_supported_language( string $language ): bool {
@@ -249,5 +275,11 @@ class Settings {
         }
 
         return strtoupper( array_shift( $parts ) );
+    }
+
+    private function is_field_filtered( string $key ): bool {
+        $filtered = apply_filters( 'rrze_webt_credentials', [] );
+
+        return is_array( $filtered ) && array_key_exists( $key, $filtered ) && '' !== $filtered[ $key ];
     }
 }
