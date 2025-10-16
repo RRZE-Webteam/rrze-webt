@@ -134,7 +134,7 @@ class WebTClient
      * 
      * @param string $content         The content to translate (HTML).
      * @param string $target_language The target language code (e.g. "EN").
-     * @param string $source_language The source language code (e.g. "DE") or empty for auto-detect.
+     * @param string $source_language The source language code (e.g. "DE").
      * @param int    $post_id         The related post ID (for logging and filters).
      * @param array  $callbacks       Optional associative array with 'success' and 'error' callback URLs.
      * @param string $client_token    Optional client token to associate with the request.
@@ -158,10 +158,6 @@ class WebTClient
         $target_language = $this->reduce_language_code($target_language_full);
         $source_language = $source_language_full ? $this->reduce_language_code($source_language_full) : '';
 
-        error_log(sprintf('RRZE WEB-T: normalize languages target=%s full=%s source=%s full=%s', $target_language, $target_language_full, $source_language, $source_language_full));
-
-        error_log(sprintf('RRZE WEB-T: translate request (post %d) title=%s target=%s (%s) source=%s (%s)', $post_id, $title ? 'yes' : 'no', $target_language, $target_language_full, $source_language, $source_language_full));
-
         $title_for_translation = '' !== $title ? $title : get_the_title($post_id);
         $document              = $this->compose_translation_document($title_for_translation, $content);
 
@@ -184,6 +180,7 @@ class WebTClient
             'callerInformation' => [
                 'application' => $application_name,
             ],
+            'sourceLanguage'    => $source_language,
         ];
 
         if ($source_language) {
@@ -217,8 +214,6 @@ class WebTClient
          */
         $payload = apply_filters('rrze_webt_request_payload', $payload, $content, $target_language_full, $source_language_full, $post_id);
 
-        error_log(sprintf('RRZE WEB-T: payload for post %d - %s', $post_id, wp_json_encode($payload)));
-
         // Allow custom timeout via filter (default 20 seconds)
         $http_timeout = (int) apply_filters('rrze_webt_http_timeout', 20);
 
@@ -243,21 +238,16 @@ class WebTClient
          */
         $request_args = apply_filters('rrze_webt_request_args', $request_args, $payload, $endpoint);
 
-        error_log(sprintf('RRZE WEB-T: request args (%s)', wp_json_encode($request_args)));
-
         $translate_url = $this->resolve_translate_endpoint($endpoint);
 
         $response = $this->dispatch_request_with_digest($translate_url, $request_args, $application_name, $password);
 
         if (is_wp_error($response)) {
-            error_log(sprintf('RRZE WEB-T: request error %s', $response->get_error_message()));
             return $response;
         }
 
         $status_code = (int) wp_remote_retrieve_response_code($response);
         $body        = wp_remote_retrieve_body($response);
-
-        error_log(sprintf('RRZE WEB-T: response status %d body=%s', $status_code, $body));
 
         if ($status_code < 200 || $status_code >= 300) {
             $message = $this->describe_api_error($body);
@@ -283,13 +273,10 @@ class WebTClient
                 $document = $this->extract_translation_document($data);
 
                 if (is_wp_error($document)) {
-                    error_log(sprintf('RRZE WEB-T: translation document error %s', $document->get_error_message()));
                     return $document;
                 }
 
                 $segments = $this->split_translated_document($document);
-
-                error_log(sprintf('RRZE WEB-T: translation segments %s', wp_json_encode($segments)));
 
                 return apply_filters('rrze_webt_translation_result', $segments, $data);
             }
@@ -301,7 +288,6 @@ class WebTClient
                     $code    = (int) $request_id;
                     $message = $this->lookup_error_message($code) ?: __('The WEB-T service rejected the translation request.', 'rrze-webt');
 
-                    error_log(sprintf('RRZE WEB-T: async error %s (%d)', $message, $code));
                     return new WP_Error('rrze_webt_remote_error', $message, ['body' => $body, 'code' => $code, 'response' => $data]);
                 }
 
@@ -321,7 +307,6 @@ class WebTClient
             $numeric_id = (int) $trimmed_body;
 
             if ($numeric_id > 0) {
-                error_log(sprintf('RRZE WEB-T: async numeric id %d', $numeric_id));
                 return new WP_Error(
                     'rrze_webt_async_job',
                     '',
@@ -333,8 +318,6 @@ class WebTClient
 
             $message = $this->lookup_error_message($numeric_id) ?: __('The WEB-T service rejected the translation request.', 'rrze-webt');
 
-            error_log(sprintf('RRZE WEB-T: numeric error %s (%d)', $message, $numeric_id));
-
             return new WP_Error('rrze_webt_remote_error', $message, ['body' => $body, 'code' => $numeric_id]);
         }
 
@@ -345,20 +328,16 @@ class WebTClient
         }
 
         if (! is_array($data)) {
-            error_log('RRZE WEB-T: invalid response structure');
             return new WP_Error('rrze_webt_invalid_response', __('The WEB-T API returned an invalid response.', 'rrze-webt'), ['body' => $body]);
         }
 
         $document = $this->extract_translation_document($data);
 
         if (is_wp_error($document)) {
-            error_log(sprintf('RRZE WEB-T: document extraction error %s', $document->get_error_message()));
             return $document;
         }
 
         $segments = $this->split_translated_document($document);
-
-        error_log(sprintf('RRZE WEB-T: final segments %s', wp_json_encode($segments)));
 
         /**
          * Filter the translation returned by the WEB-T API.
@@ -529,19 +508,16 @@ class WebTClient
 
         if ($source_language) {
             $normalized = $this->normalize_language_code($source_language);
-            error_log(sprintf('RRZE WEB-T: determine source (provided) %s -> %s', $source_language, $normalized));
             return $normalized;
         }
 
         $locale = get_locale();
 
         if (! $locale) {
-            error_log('RRZE WEB-T: determine source - empty locale');
             return '';
         }
 
         $normalized = $this->normalize_language_code($locale);
-        error_log(sprintf('RRZE WEB-T: determine source from locale %s -> %s', $locale, $normalized));
         return $normalized;
     }
 
