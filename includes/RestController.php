@@ -164,8 +164,6 @@ class RestController extends WP_REST_Controller
             $title = get_the_title($post_id);
         }
 
-        error_log(sprintf('RRZE WEB-T: REST translate post=%d title=%s target=%s source=%s', $post_id, $title ? 'yes' : 'no', $target_language, $source_language));
-
         if ('' === trim($content)) {
             return new WP_Error('rrze_webt_empty_content', __('There is no content to translate.', 'rrze-webt'), ['status' => 400]);
         }
@@ -187,7 +185,6 @@ class RestController extends WP_REST_Controller
         $translation = $this->client->translate($content, $target_language, $source_language, $post_id, $callbacks, $client_token, $title);
 
         if (is_wp_error($translation)) {
-            error_log(sprintf('RRZE WEB-T: REST translate error %s', $translation->get_error_message()));
             if ('rrze_webt_async_job' === $translation->get_error_code()) {
                 $data       = $translation->get_error_data();
                 $request_id = (string) ($data['request_id'] ?? '');
@@ -207,7 +204,6 @@ class RestController extends WP_REST_Controller
                     );
                 }
 
-                error_log(sprintf('RRZE WEB-T: REST async job %s', $request_id));
                 return new WP_REST_Response(
                     [
                         'jobId'          => $request_id,
@@ -285,8 +281,6 @@ class RestController extends WP_REST_Controller
 
         $jobs = $this->job_store->get_jobs_for_post($post_id);
 
-        error_log(sprintf('RRZE WEB-T: REST jobs post=%d count=%d', $post_id, count($jobs)));
-
         // Automatically mark stale jobs as failed (timeout)
         $max_age_sec = (int) apply_filters('rrze_webt_job_max_age_seconds', 5 * 60); // 5 min default
         $now = time();
@@ -322,12 +316,10 @@ class RestController extends WP_REST_Controller
         $job   = $this->job_store->get_job_by_token($token);
 
         if (! $job) {
-            error_log(sprintf('RRZE WEB-T: ACK token %s not found', $token));
             return new WP_REST_Response(['status' => 'acknowledged'], 200);
         }
 
         $updated = $this->job_store->acknowledge_job($token);
-        error_log(sprintf('RRZE WEB-T: ACK marked token %s', $token));
 
         return new WP_REST_Response(
             [
@@ -360,7 +352,6 @@ class RestController extends WP_REST_Controller
             $message = $this->extract_error_message($request);
             $this->job_store->fail_job($token, $message);
 
-            error_log(sprintf('RRZE WEB-T: callback error token %s message %s', $token, $message));
             return new WP_REST_Response(['status' => 'received', 'message' => $message], 200);
         }
 
@@ -368,8 +359,6 @@ class RestController extends WP_REST_Controller
 
         if (is_wp_error($segments)) {
             $this->job_store->fail_job($token, $segments->get_error_message());
-
-            error_log(sprintf('RRZE WEB-T: callback invalid content token %s error %s', $token, $segments->get_error_message()));
 
             return new WP_REST_Response(['status' => 'invalid_content'], 400);
         }
