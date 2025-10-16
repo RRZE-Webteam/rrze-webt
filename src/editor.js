@@ -1,16 +1,25 @@
 (function () {
     const { registerPlugin } = wp.plugins;
+
     const { PluginSidebar, PluginSidebarMoreMenuItem } = wp.editPost;
+
     const { PanelBody, SelectControl, Button, Notice, Spinner, Dashicon } =
         wp.components;
+
     const { Fragment, useMemo, useState, useEffect, useRef } = wp.element;
+
     const dataSelect = wp.data.select;
+
     const dataDispatch = wp.data.dispatch;
+
     const { __ } = wp.i18n;
+
     const apiFetch = wp.apiFetch;
+
     const notices = dataDispatch("core/notices");
 
     const config = window.RRZEWebTConfig || {};
+
     const normalizeLanguage = (lang) => {
         if (!lang) {
             return "";
@@ -22,20 +31,47 @@
     const rawLanguages = Array.isArray(config.availableLanguages)
         ? config.availableLanguages
         : [];
+
     const sourceLanguage = normalizeLanguage(config.sourceLanguage);
+
     const uniqueLanguages = Array.from(
         new Set(rawLanguages.map(normalizeLanguage).filter(Boolean))
     );
+
     const baseLanguages = uniqueLanguages.length ? uniqueLanguages : ["EN"];
+
     const siteLanguage = normalizeLanguage(
         config.siteLanguage || sourceLanguage || baseLanguages[0]
     );
+
     const availableLanguages = Array.from(
         new Set([...baseLanguages, siteLanguage].filter(Boolean))
     );
+
     const sortedLanguages = [...availableLanguages].sort();
+
     const hasCredentials = !!config.hasCredentials;
+
+    const LAST_TARGET_KEY = "rrze-webt:lastTargetLanguage";
+
+    const loadLastTarget = () => {
+        try {
+            const raw = localStorage.getItem(LAST_TARGET_KEY);
+            return normalizeLanguage(raw);
+        } catch {
+            return "";
+        }
+    };
+    const saveLastTarget = (lang) => {
+        try {
+            if (lang) {
+                localStorage.setItem(LAST_TARGET_KEY, normalizeLanguage(lang));
+            }
+        } catch {}
+    };
+
     const defaultLanguage = siteLanguage;
+
     const panelTitle =
         (config.i18n && config.i18n.panelTitle) ||
         __("WEB-T Translation", "rrze-webt");
@@ -188,18 +224,26 @@
     );
 
     const TranslationContent = () => {
+        const lastTarget = useMemo(() => {
+            const lt = loadLastTarget();
+            return availableLanguages.includes(lt) ? lt : "";
+        }, [availableLanguages]);
+
         const [targetLanguage, setTargetLanguage] = useState(() => {
-            if (sortedLanguages.includes(defaultLanguage)) {
+            if (lastTarget) return lastTarget;
+            if (sortedLanguages.includes(defaultLanguage))
                 return defaultLanguage;
-            }
-            if (sortedLanguages.length) {
-                return sortedLanguages[0];
-            }
+            if (sortedLanguages.length) return sortedLanguages[0];
             return availableLanguages[0] || "";
         });
         const [isTranslating, setIsTranslating] = useState(false);
+
         const [errorMessage, setErrorMessage] = useState("");
-        const [currentSource, setCurrentSource] = useState("");
+
+        const [currentSource, setCurrentSource] = useState(
+            () => lastTarget || defaultLanguage
+        );
+
         const [jobs, setJobs] = useState([]);
         const [isLoadingJobs, setIsLoadingJobs] = useState(false);
         const [expandedTokens, setExpandedTokens] = useState([]);
@@ -224,6 +268,7 @@
         const disabled =
             !hasCredentials ||
             !targetLanguage ||
+            !currentSource ||
             options.length === 0 ||
             isTranslating ||
             hasPendingJob;
@@ -415,17 +460,10 @@
         };
 
         const sourceOptions = useMemo(() => {
-            const opts = availableLanguages.map((language) => ({
+            return availableLanguages.map((language) => ({
                 label: language,
                 value: language,
             }));
-
-            opts.unshift({
-                label: getString("sourceAuto", __("Auto detect", "rrze-webt")),
-                value: "",
-            });
-
-            return opts;
         }, [availableLanguages]);
 
         const renderJobs = () => {
@@ -799,7 +837,11 @@
                 ),
                 value: targetLanguage,
                 options,
-                onChange: (value) => setTargetLanguage(value),
+                onChange: (value) => {
+                    const v = normalizeLanguage(value);
+                    setTargetLanguage(v);
+                    saveLastTarget(v);
+                },
                 disabled: options.length === 0,
             }),
             wp.element.createElement(
