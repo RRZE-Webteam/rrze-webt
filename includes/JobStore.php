@@ -43,7 +43,6 @@ class JobStore
         $post_id = (int) ($job['post_id'] ?? 0);
 
         if ($post_id <= 0) {
-            error_log(sprintf('RRZE WEB-T: skipped job creation for token=%s because post_id is invalid', $job['token'] ?? ''));
             return;
         }
 
@@ -51,7 +50,6 @@ class JobStore
         $request_id = (string) ($job['request_id'] ?? '');
 
         if ('' === $token || '' === $request_id) {
-            error_log('RRZE WEB-T: skipped job creation due to missing token or request id.');
             return;
         }
 
@@ -83,7 +81,6 @@ class JobStore
         array_unshift($index, $token);
 
         $this->trim_and_store_index($post_id, $index);
-        error_log(sprintf('RRZE WEB-T: create job token=%s request=%s post=%d', $token, $request_id, $post_id));
     }
 
     /**
@@ -267,8 +264,6 @@ class JobStore
 
         $this->save_jobs_index($post_id, $index);
 
-        error_log(sprintf('RRZE WEB-T: remove job token=%s for post=%d', $token, $post_id));
-
         return true;
     }
 
@@ -299,8 +294,6 @@ class JobStore
         }
 
         $this->save_jobs_index($post_id, $tokens);
-
-        error_log(sprintf('RRZE WEB-T: enforce limit for post %d tokens kept: %s', $post_id, wp_json_encode($tokens)));
     }
 
     /**
