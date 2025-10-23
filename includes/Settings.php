@@ -36,6 +36,13 @@ class Settings
      */
     public function register_settings(): void
     {
+        $appFiltered = $this->is_field_filtered('application_name');
+        $pwdFiltered = $this->is_field_filtered('password');
+
+        if ($appFiltered && $pwdFiltered) {
+            return;
+        }
+
         register_setting('rrze_webt', self::OPTION_NAME, [$this, 'sanitize_settings']);
 
         add_settings_section(
@@ -45,29 +52,45 @@ class Settings
             'rrze_webt'
         );
 
+        // API URL
         add_settings_field(
             'rrze_webt_api_url',
             __('API Endpoint URL', 'rrze-webt'),
             [$this, 'render_api_url_field'],
             'rrze_webt',
-            'rrze_webt_main'
+            'rrze_webt_main',
+            ['label_for' => 'rrze_webt_api_url']
         );
 
+        // Application Name
         add_settings_field(
             'rrze_webt_application_name',
-            __('Application Name', 'rrze-webt'),
+            $appFiltered ? '' : __('Application Name', 'rrze-webt'),
             [$this, 'render_application_name_field'],
             'rrze_webt',
-            'rrze_webt_main'
+            'rrze_webt_main',
+            [
+                'label_for' => 'rrze_webt_application_name',
+                'class'     => $appFiltered ? 'rrze-webt-row--hidden' : ''
+            ]
         );
 
+        // Password
         add_settings_field(
             'rrze_webt_password',
-            __('Password', 'rrze-webt'),
+            $pwdFiltered ? '' : __('Password', 'rrze-webt'),
             [$this, 'render_password_field'],
             'rrze_webt',
-            'rrze_webt_main'
+            'rrze_webt_main',
+            [
+                'label_for' => 'rrze_webt_password',
+                'class'     => $pwdFiltered ? 'rrze-webt-row--hidden' : ''
+            ]
         );
+
+        add_action('admin_head', function () {
+            echo '<style>.rrze-webt-row--hidden{display:none;}</style>';
+        });
     }
 
     /**
@@ -77,6 +100,13 @@ class Settings
      */
     public function register_menu_page(): void
     {
+        $appFiltered = $this->is_field_filtered('application_name');
+        $pwdFiltered = $this->is_field_filtered('password');
+
+        if ($appFiltered && $pwdFiltered) {
+            return;
+        }
+
         add_options_page(
             __('WEB-T Translator', 'rrze-webt'),
             __('WEB-T Translator', 'rrze-webt'),
@@ -121,14 +151,19 @@ class Settings
      */
     public function render_application_name_field(): void
     {
-        $readonly = $this->is_field_filtered('application_name');
-        $options  = $this->get_options();
+        $is_filtered = $this->is_field_filtered('application_name');
+        $options     = $this->get_options();
+
+        $type = $is_filtered ? 'hidden' : 'text';
+        $attr = $is_filtered ? '' : 'autocomplete="off"';
+
         printf(
-            '<input type="text" name="%1$s[application_name]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" %4$s />',
+            '<input type="%1$s" name="%2$s[application_name]" id="%3$s" value="%4$s" class="regular-text" %5$s />',
+            esc_attr($type),
             esc_attr(self::OPTION_NAME),
             esc_attr('rrze_webt_application_name'),
             esc_attr($options['application_name']),
-            $readonly ? 'readonly disabled' : ''
+            $attr
         );
     }
 
@@ -139,14 +174,19 @@ class Settings
      */
     public function render_password_field(): void
     {
-        $readonly = $this->is_field_filtered('password');
-        $options  = $this->get_options();
+        $is_filtered = $this->is_field_filtered('password');
+        $options     = $this->get_options();
+
+        $type = $is_filtered ? 'hidden' : 'password';
+        $attr = $is_filtered ? '' : 'autocomplete="off"';
+
         printf(
-            '<input type="password" name="%1$s[password]" id="%2$s" value="%3$s" class="regular-text" autocomplete="off" %4$s />',
+            '<input type="%1$s" name="%2$s[password]" id="%3$s" value="%4$s" class="regular-text" %5$s />',
+            esc_attr($type),
             esc_attr(self::OPTION_NAME),
             esc_attr('rrze_webt_password'),
             esc_attr($options['password']),
-            $readonly ? 'readonly disabled' : ''
+            $attr
         );
     }
 
