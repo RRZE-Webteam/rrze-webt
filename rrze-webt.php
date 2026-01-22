@@ -3,7 +3,7 @@
 /*
 Plugin Name:        RRZE WEB-T Translator
 Plugin URI:         https://github.com/RRZE-Webteam/rrze-webt
-Version:            1.0.1
+Version:            1.0.2
 Description:        Integrates the WEB-T translation API into the block editor to translate post content while editing.
 Author:             RRZE Webteam
 Author URI:         https://blogs.fau.de/webworking/
