@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: RRZE WEB-T Translator 1.0.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/rrze-webt\n"
-"POT-Creation-Date: 2025-10-16T07:41:18+00:00\n"
-"PO-Revision-Date: 2025-10-16 09:42+0200\n"
+"POT-Creation-Date: 2026-01-22T14:24:24+00:00\n"
+"PO-Revision-Date: 2026-01-22 15:26+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: de_DE@formal\n"
@@ -237,27 +237,28 @@ msgstr "WEB-T-Callback-Inhalte sind nicht gültig, Base64."
 msgid "WEB-T callback did not include any content."
 msgstr "Der WEB-T-Callback enthielt keinen Inhalt."
 
-#: includes/Settings.php:43
+#: includes/Settings.php:50
 msgid "WEB-T API Settings"
 msgstr "WEB-T API-Einstellungen"
 
-#: includes/Settings.php:50
+#: includes/Settings.php:58
 msgid "API Endpoint URL"
 msgstr "URL des API-Endpunkts"
 
-#: includes/Settings.php:58
+#: includes/Settings.php:68
 msgid "Application Name"
 msgstr "Anwendungsname"
 
-#: includes/Settings.php:66
+#: includes/Settings.php:81
 msgid "Password"
 msgstr "Passwort"
 
-#: includes/Settings.php:81 includes/Settings.php:82 includes/Settings.php:165
+#: includes/Settings.php:111 includes/Settings.php:112
+#: includes/Settings.php:205
 msgid "WEB-T Translator"
 msgstr "WEB-T Übersetzer"
 
-#: includes/Settings.php:96
+#: includes/Settings.php:126
 msgid ""
 "Configure the credentials used to communicate with the WEB-T translation API."
 msgstr ""
@@ -526,41 +527,45 @@ msgstr ""
 "Bitte konfigurieren Sie zuerst den Namen und das Passwort der WEB-T-"
 "Anwendung."
 
+#: includes/WebTClient.php:157
+msgid "The WEB-T API URL is not configured."
+msgstr "Die WEB-T-API-URL ist nicht konfiguriert."
+
 #. translators: %1$d: HTTP status code, %2$s: response body
-#: includes/WebTClient.php:258
+#: includes/WebTClient.php:267
 #, php-format
 msgid "The WEB-T API returned an unexpected status code (%1$d): %2$s"
 msgstr ""
 "Die WEB-T-API hat einen unerwarteten Statuscode (%1$d) zurückgegeben: %2$s"
 
-#: includes/WebTClient.php:289 includes/WebTClient.php:319
+#: includes/WebTClient.php:298 includes/WebTClient.php:328
 msgid "The WEB-T service rejected the translation request."
 msgstr "Der WEB-T-Dienst hat die Übersetzungsanforderung abgelehnt."
 
-#: includes/WebTClient.php:326
+#: includes/WebTClient.php:335
 msgid "The WEB-T API reported an error."
 msgstr "Die WEB-T-API hat einen Fehler gemeldet."
 
-#: includes/WebTClient.php:331
+#: includes/WebTClient.php:340
 msgid "The WEB-T API returned an invalid response."
 msgstr "Die WEB-T-API hat eine ungültige Antwort zurückgegeben."
 
-#: includes/WebTClient.php:383
+#: includes/WebTClient.php:392
 msgid "The WEB-T API response did not include a translation."
 msgstr "Die WEB-T-API-Antwort enthielt keine Übersetzung."
 
-#: includes/WebTClient.php:608
+#: includes/WebTClient.php:642
 msgid "Unable to obtain the authentication challenge from the WEB-T service."
 msgstr ""
 "Die Authentifizierungsabfrage vom WEB-T-Dienst kann nicht abgerufen werden."
 
-#: includes/WebTClient.php:636
+#: includes/WebTClient.php:693
 msgid "The WEB-T service returned an invalid authentication challenge."
 msgstr ""
 "Der WEB-T-Dienst hat eine ungültige Authentifizierungsaufforderung "
 "zurückgegeben."
 
-#: includes/WebTClient.php:765
+#: includes/WebTClient.php:822
 msgid "Empty response from the WEB-T service."
 msgstr "Leere Antwort vom WEB-T-Dienst."
 
