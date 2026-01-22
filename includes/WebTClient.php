@@ -43,7 +43,7 @@ class WebTClient
     /**
      * @var Settings
      */
-    private $settings;
+    private Settings $settings;
 
     /**
      * Get the error map for WEB-T error codes.
@@ -152,6 +152,11 @@ class WebTClient
         $application_name = $this->settings->get_application_name();
         $password         = $this->settings->get_password();
 
+        $translate_url = $this->resolve_translate_endpoint($endpoint);
+        if ('' === $translate_url) {
+            return new WP_Error('rrze_webt_missing_endpoint', __('The WEB-T API URL is not configured.', 'rrze-webt'));
+        }
+
         $target_language_full = $this->normalize_language_code($target_language);
         $source_language_full = $this->determine_source_language($source_language);
 
@@ -183,10 +188,6 @@ class WebTClient
             'sourceLanguage'    => $source_language,
         ];
 
-        if ($source_language) {
-            $payload['sourceLanguage'] = $source_language;
-        }
-
         if (! empty($callbacks['success'])) {
             $payload['destinations'] = [
                 'httpDestinations' => [$callbacks['success']],
@@ -216,17 +217,27 @@ class WebTClient
 
         // Allow custom timeout via filter (default 20 seconds)
         $http_timeout = (int) apply_filters('rrze_webt_http_timeout', 20);
+        $sslverify    = (bool) apply_filters('rrze_webt_sslverify', true);
+        $httpversion  = (string) apply_filters('rrze_webt_httpversion', '1.1');
+        $force_tls12  = (bool) apply_filters('rrze_webt_force_tls12', true);
+        $force_ipv4   = (bool) apply_filters('rrze_webt_force_ipv4', true);
+        $curl_overrides = $this->build_curl_overrides($force_ipv4, $force_tls12);
 
         $request_args = [
             'method'      => 'POST',
             'headers'     => [
                 'Content-Type' => 'application/json',
                 'Accept'       => 'application/json',
+                'Connection'   => 'close',
+                // Avoid "Expect: 100-continue" proxy edge cases.
+                'Expect'       => '',
             ],
             'body'        => wp_json_encode($payload),
             'timeout'     => $http_timeout,
             'redirection' => 5,
-            'sslverify'   => false,
+            'sslverify'   => $sslverify,
+            'httpversion' => $httpversion ?: '1.1',
+            'curl'        => $curl_overrides,
         ];
 
         /**
@@ -237,8 +248,6 @@ class WebTClient
          * @param string $endpoint     The API endpoint URL.
          */
         $request_args = apply_filters('rrze_webt_request_args', $request_args, $payload, $endpoint);
-
-        $translate_url = $this->resolve_translate_endpoint($endpoint);
 
         $response = $this->dispatch_request_with_digest($translate_url, $request_args, $application_name, $password);
 
@@ -391,8 +400,9 @@ class WebTClient
      */
     private function resolve_translate_endpoint(string $endpoint): string
     {
+        // Empty endpoint must not become a local WP-relative URL.
         if ('' === $endpoint) {
-            return '/translate';
+            return '';
         }
 
         if (preg_match('#/translate$#i', $endpoint)) {
@@ -534,7 +544,7 @@ class WebTClient
     {
         $method = strtoupper($args['method'] ?? 'POST');
 
-        $challenge = $this->acquire_digest_challenge($url, $method, $args);
+        $challenge = $this->acquire_digest_challenge($url, $args);
 
         if (is_wp_error($challenge)) {
             return $challenge;
@@ -557,6 +567,12 @@ class WebTClient
         }
 
         $args['headers']['Authorization'] = $auth_header;
+        // Carry session cookie (required by "Proxy-support: Session-based-authentication")
+        if (! empty($challenge['jsessionid'])) {
+            $args['headers']['Cookie'] = 'JSESSIONID=' . $challenge['jsessionid'];
+        }
+        // Defensive (some proxies choke on Expect: 100-continue)
+        $args['headers']['Expect'] = '';
 
         return wp_remote_request($url, $args);
     }
@@ -565,17 +581,31 @@ class WebTClient
      * Acquires the Digest authentication challenge from the server.
      * 
      * @param string $url    The request URL.
-     * @param string $method The HTTP method (e.g. "POST").
      * @param array  $args   The original request arguments (for timeout, sslverify, etc.).
      * @return array|WP_Error Associative array with 'header' and 'response' keys on success, or WP_Error on failure.
      */
-    private function acquire_digest_challenge(string $url, string $method, array $args)
+    private function acquire_digest_challenge(string $url, array $args)
     {
+        $timeout    = $args['timeout'] ?? (int) apply_filters('rrze_webt_http_timeout', 20);
+        $sslverify  = isset($args['sslverify']) ? (bool) $args['sslverify'] : (bool) apply_filters('rrze_webt_sslverify', true);
+        $httpversion = isset($args['httpversion']) ? (string) $args['httpversion'] : (string) apply_filters('rrze_webt_httpversion', '1.1');
+        $force_tls12  = (bool) apply_filters('rrze_webt_force_tls12', true);
+        $force_ipv4   = (bool) apply_filters('rrze_webt_force_ipv4', true);
+        $curl_overrides = $this->build_curl_overrides($force_ipv4, $force_tls12);
+
+        // Use GET to obtain WWW-Authenticate (some gateways return 405 for HEAD).
         $handshake_args = [
-            'method'      => $method,
-            'timeout'     => $args['timeout'] ?? (int) apply_filters('rrze_webt_http_timeout', 20),
-            'sslverify'   => $args['sslverify'] ?? false,
+            'method'      => 'GET',
+            'timeout'     => (int) $timeout,
+            'sslverify'   => $sslverify,
             'redirection' => 0,
+            'httpversion' => $httpversion ?: '1.1',
+            'headers'     => [
+                'Accept'     => 'application/json',
+                'Connection' => 'close',
+                'Expect'     => '',
+            ],
+            'curl'        => $curl_overrides,
         ];
 
         /**
@@ -590,6 +620,7 @@ class WebTClient
         $attempts = 0;
         $header   = '';
         $response = null;
+        $jsessionid = '';
 
         while ($attempts < 3 && '' === $header) {
             $response = wp_remote_request($url, $handshake_args);
@@ -599,6 +630,9 @@ class WebTClient
             }
 
             $header = wp_remote_retrieve_header($response, 'www-authenticate');
+            if ('' === $jsessionid) {
+                $jsessionid = $this->extract_jsessionid_from_response($response);
+            }
             $attempts++;
         }
 
@@ -615,7 +649,30 @@ class WebTClient
         return [
             'header'   => $header,
             'response' => $response,
+            'jsessionid' => $jsessionid,
         ];
+    }
+
+    /**
+     * Extract JSESSIONID from Set-Cookie response header.
+     *
+     * @param array $response WP HTTP response array.
+     * @return string
+     */
+    private function extract_jsessionid_from_response($response): string
+    {
+        $set_cookie = wp_remote_retrieve_header($response, 'set-cookie');
+        if (! $set_cookie) {
+            return '';
+        }
+
+        $raw = is_array($set_cookie) ? implode('; ', $set_cookie) : (string) $set_cookie;
+
+        if (preg_match('/\bJSESSIONID=([^;]+)/', $raw, $m)) {
+            return (string) $m[1];
+        }
+
+        return '';
     }
 
     /**
@@ -642,17 +699,17 @@ class WebTClient
             $realm .= ' Realm via Digest Authentication';
         }
 
-        $path = parse_url($url, PHP_URL_PATH);
-        if (! $path) {
-            $path = '/';
-        }
+        // RFC: use request-uri. Include query string if present.
+        $path  = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+        $query = parse_url($url, PHP_URL_QUERY);
+        $uri   = $query ? ($path . '?' . $query) : $path;
 
         $qop    = $this->normalize_qop($challenge['qop'] ?? '');
         $nc     = '00000001';
         $cnonce = $this->generate_cnonce();
 
         $ha1 = md5($username . ':' . $realm . ':' . $password);
-        $ha2 = md5($method . ':' . $path);
+        $ha2 = md5($method . ':' . $uri);
 
         if ($qop) {
             $response = md5($ha1 . ':' . $challenge['nonce'] . ':' . $nc . ':' . $cnonce . ':' . $qop . ':' . $ha2);
@@ -666,7 +723,7 @@ class WebTClient
             'username'  => sprintf('%1$s%2$s%1$s', $quote, $username),
             'realm'     => sprintf('%1$s%2$s%1$s', $quote, $realm),
             'nonce'     => sprintf('%1$s%2$s%1$s', $quote, $challenge['nonce']),
-            'uri'       => sprintf('%1$s%2$s%1$s', $quote, $path),
+            'uri'       => sprintf('%1$s%2$s%1$s', $quote, $uri),
             'algorithm' => sprintf('%1$sMD5%1$s', $quote),
             'response'  => sprintf('%1$s%2$s%1$s', $quote, $response),
         ];
@@ -815,5 +872,36 @@ class WebTClient
         }
 
         return $message;
+    }
+
+    /**
+     * Build cURL overrides in a defensive way.
+     * - Only sets options when the corresponding constant exists.
+     * - Avoids passing "0" for CURLOPT_SSLVERSION / relying on CURL_IPRESOLVE_WHATEVER.
+     *
+     * @param bool $force_ipv4 Force IPv4 if possible.
+     * @param bool $force_tls12 Force TLS 1.2 if possible.
+     * @return array<int, mixed>
+     */
+    private function build_curl_overrides(bool $force_ipv4, bool $force_tls12): array
+    {
+        $curl = [
+            // Avoid connection reuse issues with some proxies/gateways.
+            CURLOPT_FRESH_CONNECT => true,
+            CURLOPT_FORBID_REUSE  => true,
+            // Force HTTP/1.1 at curl level (more reliable than WP's httpversion).
+            CURLOPT_HTTP_VERSION  => CURL_HTTP_VERSION_1_1,
+        ];
+
+        if ($force_ipv4 && defined('CURL_IPRESOLVE_V4')) {
+            $curl[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        }
+
+        // Some middleboxes choke on TLS1.3; make it configurable.
+        if ($force_tls12 && defined('CURL_SSLVERSION_TLSv1_2')) {
+            $curl[CURLOPT_SSLVERSION] = CURL_SSLVERSION_TLSv1_2;
+        }
+
+        return $curl;
     }
 }
