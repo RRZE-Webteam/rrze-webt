@@ -1,0 +1,7 @@
+{
+  "requestId": 481001,
+  "targetLanguages": ["EN"],
+  "externalReference": "replaced-per-test",
+  "errorCode": -30000,
+  "errorMessage": "Cannot convert input file"
+}

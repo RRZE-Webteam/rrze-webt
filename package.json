@@ -1,7 +1,8 @@
 {
   "scripts": {
     "build": "wp-scripts build",
-    "start": "wp-scripts start"
+    "start": "wp-scripts start",
+    "test:integration": "bash tests/run.sh"
   },
   "devDependencies": {
     "@wordpress/scripts": "^30.25.0"

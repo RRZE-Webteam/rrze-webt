@@ -51,6 +51,27 @@ Integrates the WEB-T translation API into the WordPress block editor so authors 
 
 - `npm run build` – Bundles `src/editor.js` and `src/editor.scss` into `build/editor.js` and `build/editor.css`.
 - `npm run start` – Watches the same sources and rebuilds into `build/` on changes.
+- `npm run test:integration -- <local-site-url>` – Runs the network-isolated WordPress integration tests. See [local simulation and tests](tests/README.md) for prerequisites, scenarios and known failures.
+
+### Release archives
+
+Tests remain versioned alongside the plugin, including on `main`. The root
+`.gitattributes` marks `tests` as `export-ignore`, excluding the entire test suite
+from `git archive` and GitHub's generated source ZIP/TAR downloads. To run the
+tests, use a Git checkout rather than a release archive.
+
+After committing the release contents, including the compiled `build/` assets and
+`.gitattributes`, create an installable ZIP from that commit:
+
+```sh
+git archive --format=zip --prefix=rrze-webt/ --output=/tmp/rrze-webt.zip HEAD
+```
+
+For a tagged release, replace `HEAD` with its tag. The exclusion takes effect only
+for commits/tags containing `.gitattributes`; existing releases are unchanged.
+Manually uploaded release assets must be built with this command or an equivalent
+exclusion: copying the checkout or using a generic ZIP command does not apply Git
+export rules.
 
 ## License
 

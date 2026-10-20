@@ -1,0 +1,2 @@
+# Keep the integration suite in Git, but omit it from release archives.
+/tests export-ignore

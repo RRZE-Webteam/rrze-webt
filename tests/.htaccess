@@ -1,0 +1,3 @@
+# Apache 2.4: deny HTTP access to the CLI test suite and its fixtures.
+# Local filesystem access through WP-CLI remains available.
+Require all denied
