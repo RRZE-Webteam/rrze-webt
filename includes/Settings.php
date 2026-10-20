@@ -123,7 +123,7 @@ class Settings
      */
     public function render_settings_section_intro(): void
     {
-        echo '<p>' . esc_html__('Configure the credentials used to communicate with the WEB-T translation API.', 'rrze-webt') . '</p>';
+        echo '<p>' . esc_html__('Configure eTranslation REST v2 credentials and the complete HTTPS endpoint URL.', 'rrze-webt') . '</p>';
     }
 
     /**
@@ -136,7 +136,7 @@ class Settings
         $readonly = $this->is_field_filtered('api_url');
         $options  = $this->get_options();
         printf(
-            '<input type="text" name="%1$s[api_url]" id="%2$s" value="%3$s" class="regular-text" placeholder="https://api.example.com/translate" %4$s />',
+            '<input type="url" name="%1$s[api_url]" id="%2$s" value="%3$s" class="regular-text" placeholder="https://language-tools.ec.europa.eu/etranslation/api/askTranslate" %4$s />',
             esc_attr(self::OPTION_NAME),
             esc_attr('rrze_webt_api_url'),
             esc_attr($options['api_url']),
@@ -261,7 +261,7 @@ class Settings
     /**
      * Gets the configured API URL.
      * 
-     * @return string The API URL (empty string if not set).
+     * @return string The full API endpoint URL, or an explicitly saved empty string.
      */
     public function get_api_url(): string
     {
@@ -345,7 +345,7 @@ class Settings
     private function get_defaults(): array
     {
         $defaults = [
-            'api_url'          => '',
+            'api_url'          => 'https://language-tools.ec.europa.eu/etranslation/api/askTranslate',
             'application_name' => '',
             'password'         => '',
         ];
@@ -460,7 +460,7 @@ class Settings
      */
     private function sanitize_language_code(string $language): string
     {
-        $language = preg_replace('/[^a-zA-Z\-]/', '', $language);
+        $language = preg_replace('/[^a-zA-Z\-_]/', '', $language);
         $language = str_replace('_', '-', $language);
         $parts    = array_values(array_filter(explode('-', strtolower($language))));
 

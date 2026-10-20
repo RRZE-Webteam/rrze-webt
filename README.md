@@ -1,11 +1,11 @@
 # RRZE WEB-T Translator
 
-Integrates the WEB-T translation API into the WordPress block editor so authors can translate posts (title and content) without leaving the editor.
+Integrates eTranslation REST v2 into the WordPress block editor so authors can translate posts (title and content) without leaving the editor.
 
 ## Features
 
 - Sidebar panel in the block editor to trigger WEB-T translations.
-- Supports both synchronous and asynchronous responses from WEB-T via custom REST endpoints.
+- Submits asynchronous document requests and receives translations via custom REST endpoints.
 - Translation history limited to the three most recent jobs per post with detailed status (pending/completed/failed).
 - Manual source/target selections.
 - Stores translations in post meta to keep context across sessions.
@@ -27,9 +27,43 @@ Integrates the WEB-T translation API into the WordPress block editor so authors 
 
 | Setting | Description |
 | ------- | ----------- |
-| API Endpoint URL | Full URL to the WEB-T translate endpoint, e.g. `https://webgate.ec.europa.eu/etranslation/si/translate`. |
+| API Endpoint URL | Full HTTPS URL: `https://language-tools.ec.europa.eu/etranslation/api/askTranslate`. |
 | Application Name | Application identifier provided by WEB-T. |
 | Password | Password/secret for the application. |
+
+### eTranslation REST v2
+
+New requests use HTTP Basic authentication over HTTPS. The configured endpoint
+is used exactly as entered; the plugin does not append `/translate` or follow
+redirects. Existing v1 URLs must be updated explicitly in Settings or in the
+`rrze_webt_credentials` filter. Saved credentials and URLs are not rewritten by
+the upgrade.
+
+The plugin sends HTML in `documentToTranslate.document`, the local job reference
+in `callerInformation.externalReference`, and separate URLs for `deliveries.http`,
+`notifications.success.http` and `notifications.failure.http`. An immediate
+response must contain a positive `requestId`; it is an acknowledgement, not the
+translated document. A success notification only acknowledges completion at the
+provider. The job completes when the delivery arrives with a Base64-encoded
+`result` and `outputFormat: html`. Callback IDs, references and target languages
+must match the stored job. New jobs require JSON; outstanding pre-upgrade jobs
+can still receive raw Base64 deliveries.
+
+Custom integrations using `rrze_webt_request_payload` must return v2 fields.
+`rrze_webt_document_filename` now receives a default filename without extension,
+as required by the v2 schema. Digest-handshake and cURL workaround hooks
+(`rrze_webt_handshake_args`, `rrze_webt_force_tls12`, `rrze_webt_force_ipv4`) and
+the synchronous `rrze_webt_translation_result` hook are no longer used.
+`rrze_webt_request_args` still applies before authentication; redirects remain
+disabled. Timeout, TLS verification and HTTP-version filters remain available.
+
+The callback URLs must be reachable from the EU service. Local development uses
+the explicit CLI simulator described below. A normal editor request still uses
+the configured service. Job timing, duplicate handling and explicit application
+of results remain separate repair steps; callbacks currently still update posts
+automatically.
+
+Protocol reference: [official REST v2 OpenAPI contract](https://language-tools.ec.europa.eu/assets/downloads/eTranslation-RestV2.yaml).
 
 ## Usage
 

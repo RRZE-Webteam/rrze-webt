@@ -22,7 +22,7 @@ final class Simulator
     public const LEGACY_URL = 'https://webt.invalid/translate';
 
     /** @var string Current wire format, either legacy or v2. */
-    public string $protocol = 'legacy';
+    public string $protocol = 'v2';
 
     /** @var string Controlled response scenario. */
     public string $scenario = 'success';
@@ -30,8 +30,14 @@ final class Simulator
     /** @var array<int,array<string,mixed>> Accepted submissions awaiting delivery. */
     public array $queue = [];
 
-    /** @var array<int,array{method:string,url:string}> HTTP observations without credentials or bodies. */
+    /** @var array<int,array{method:string,url:string,redirection:int}> HTTP observations without credentials or bodies. */
     public array $requests = [];
+
+    /** @var array{status:int,body:mixed}|null Optional provider response override. */
+    public ?array $submission_response = null;
+
+    /** @var string|null Optional endpoint override for configuration checks. */
+    public ?string $endpoint = null;
 
     /** @var array<int,int> Callback status codes, including early callbacks. */
     public array $callback_statuses = [];
@@ -72,7 +78,7 @@ final class Simulator
      * @param string $scenario Success, unauthorized, timeout or early.
      * @return void
      */
-    public function reset(string $protocol = 'legacy', string $scenario = 'success'): void
+    public function reset(string $protocol = 'v2', string $scenario = 'success'): void
     {
         if (! in_array($protocol, ['legacy', 'v2'], true)
             || ! in_array($scenario, ['success', 'unauthorized', 'timeout', 'early'], true)) {
@@ -84,6 +90,8 @@ final class Simulator
         $this->queue = [];
         $this->requests = [];
         $this->callback_statuses = [];
+        $this->submission_response = null;
+        $this->endpoint = null;
         $this->next_id = $this->fixture('v2-accepted.json')['requestId'];
     }
 
@@ -95,7 +103,7 @@ final class Simulator
     public function settings(): array
     {
         return [
-            'api_url' => $this->protocol === 'v2' ? self::V2_URL : self::LEGACY_URL,
+            'api_url' => $this->endpoint ?? ($this->protocol === 'v2' ? self::V2_URL : self::LEGACY_URL),
             'application_name' => 'local-fixture',
             'password' => 'not-a-real-password',
         ];
@@ -158,7 +166,7 @@ final class Simulator
     {
         $method = strtoupper($args['method'] ?? 'GET');
         // A third-party hook may put secrets in query strings; never record them.
-        $this->requests[] = ['method' => $method, 'url' => strtok($url, '?')];
+        $this->requests[] = ['method' => $method, 'url' => strtok($url, '?'), 'redirection' => (int) ($args['redirection'] ?? 5)];
         if (wp_parse_url($url, PHP_URL_HOST) !== 'webt.invalid') {
             return new WP_Error('rrze_webt_test_network_blocked', 'Network disabled by the local WEB-T test suite.');
         }
@@ -214,6 +222,13 @@ final class Simulator
         // Validate callback destinations before accepting, never dispatch arbitrary URLs.
         $this->callback_route($success);
         $this->callback_route($failure);
+        $notification = $payload['notifications']['success']['http'] ?? '';
+        if ($notification !== '') {
+            $this->callback_route($notification);
+        }
+        if ($this->submission_response !== null) {
+            return $this->response($this->submission_response['status'], $this->submission_response['body']);
+        }
         $receipt = [
             'requestId' => $this->next_id++,
             'externalReference' => $token,
@@ -221,6 +236,9 @@ final class Simulator
             'targetLanguage' => $payload['targetLanguages'][0],
             'success' => $success,
             'failure' => $failure,
+            'notification' => $notification,
+            'document' => base64_decode($payload['documentToTranslate']['document']['content'] ?? $payload['documentToTranslateBase64']['content'], true),
+            'filename' => $payload['documentToTranslate']['document']['filename'] ?? '',
         ];
         $this->queue[] = $receipt;
 
@@ -295,7 +313,7 @@ final class Simulator
             throw new RuntimeException('Simulator rejected a callback outside this site.');
         }
         $suffix = substr($url, strlen($prefix));
-        if (! preg_match('#^[a-zA-Z0-9-]+/(success|error)$#', $suffix)) {
+        if (! preg_match('#^[a-zA-Z0-9-]+/(success|error|notification)$#', $suffix)) {
             throw new RuntimeException('Simulator rejected an unexpected callback route.');
         }
         return '/rrze-webt/v1/callback/' . $suffix;
@@ -338,13 +356,13 @@ final class Simulator
      * This also makes early and duplicate deliveries reproducible.
      *
      * @param array<string,mixed> $receipt Accepted submission or seeded job receipt.
-     * @param string             $kind success, failure, malformed or unknown-json.
-     * @param array<string,mixed> $overrides Optional correlation-field changes.
+     * @param string             $kind success, notification, failure, malformed or unknown-json.
+     * @param array<string,mixed> $overrides Optional JSON field changes.
      * @return WP_REST_Response Response from the real plugin callback route.
      */
     public function deliver(array $receipt, string $kind = 'success', array $overrides = []): WP_REST_Response
     {
-        $url = $receipt[$kind === 'failure' ? 'failure' : 'success'];
+        $url = $receipt[$kind === 'failure' ? 'failure' : ($kind === 'notification' ? 'notification' : 'success')];
         $request = new WP_REST_Request('POST', $this->callback_route($url));
         $request->set_header('content-type', 'application/json');
         $correlation = array_merge([
@@ -359,17 +377,19 @@ final class Simulator
                 'requestId' => $correlation['requestId'],
                 'externalReference' => $correlation['externalReference'],
                 'targetLanguages' => [$correlation['targetLanguage']],
-            ]));
+            ], $overrides));
         } elseif ($kind === 'malformed') {
             $body = '{"result":';
         } elseif ($kind === 'unknown-json') {
             $body = wp_json_encode(['unexpected' => 'This is not a translation.']);
+        } elseif ($kind === 'notification') {
+            $body = wp_json_encode($correlation);
         } elseif ($kind === 'success') {
             if ($this->protocol === 'v2') {
                 $body = wp_json_encode(array_merge($correlation, [
                     'result' => base64_encode($this->translated_document()),
                     'outputFormat' => 'html',
-                ]));
+                ], $overrides));
             } else {
                 // Legacy document deliveries are raw Base64, not JSON.
                 $request->set_header('content-type', 'application/octet-stream');

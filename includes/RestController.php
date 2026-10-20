@@ -118,7 +118,7 @@ class RestController extends WP_REST_Controller
 
         register_rest_route(
             $this->namespace,
-            '/callback/(?P<token>[A-Za-z0-9\-]+)/(?P<status>success|error)?',
+            '/callback/(?P<token>[A-Za-z0-9\-]+)/(?P<status>success|error|notification)?',
             [
                 [
                     'methods'             => WP_REST_Server::CREATABLE,
@@ -177,6 +177,7 @@ class RestController extends WP_REST_Controller
         $callbacks = [
             'success' => rest_url($this->namespace . '/callback/' . $client_token . '/success'),
             'error'   => rest_url($this->namespace . '/callback/' . $client_token . '/error'),
+            'notification' => rest_url($this->namespace . '/callback/' . $client_token . '/notification'),
         ];
 
         $source_lang_normalized = $this->settings->normalize_language_code($source_language ?: '');
@@ -195,6 +196,7 @@ class RestController extends WP_REST_Controller
                         [
                             'token'           => $client_token,
                             'request_id'      => $request_id,
+                            'api_version'     => 2,
                             'post_id'         => $post_id,
                             'target_language' => $target_lang_normalized,
                             'source_language' => $source_lang_normalized ?: 'AUTO',
@@ -338,14 +340,31 @@ class RestController extends WP_REST_Controller
      */
     public function handle_callback(WP_REST_Request $request)
     {
-        $token  = (string) $request->get_param('token');
-        $status = (string) $request->get_param('status');
+        // Callback JSON must not override the token or status selected by the URL.
+        $route  = $request->get_url_params();
+        $token  = (string) ($route['token'] ?? '');
+        $status = (string) ($route['status'] ?? '');
         $status = $status ?: 'success';
 
         $job = $this->job_store->get_job_by_token($token);
 
         if (! $job) {
             return new WP_REST_Response(['status' => 'unknown_job'], 404);
+        }
+
+        if ($request->is_json_content_type()) {
+            $data = json_decode($request->get_body(), true, 512, JSON_BIGINT_AS_STRING);
+            $validation = $this->validate_v2_callback($data, $job, $status);
+            if (is_wp_error($validation)) {
+                return new WP_REST_Response(['status' => $validation->get_error_code()], 400);
+            }
+        } elseif ('success' !== $status || (int) ($job['api_version'] ?? 1) >= 2) {
+            return new WP_REST_Response(['status' => 'invalid_payload'], 400);
+        }
+
+        // A document notification contains no file. Only a delivery completes a job.
+        if ('notification' === $status) {
+            return new WP_REST_Response(['status' => 'received'], 200);
         }
 
         if ('error' === $status) {
@@ -370,6 +389,45 @@ class RestController extends WP_REST_Controller
         }
 
         return new WP_REST_Response(['status' => 'stored'], 200);
+    }
+
+    /**
+     * Validate v2 callback metadata and distinguish notifications from deliveries.
+     *
+     * Mismatching or malformed envelopes must not change an existing job or post.
+     *
+     * @param mixed  $data Decoded callback JSON.
+     * @param array  $job Stored job selected by the callback URL.
+     * @param string $status Callback kind selected by the URL.
+     * @return WP_Error|null Error for an invalid envelope, otherwise null.
+     */
+    private function validate_v2_callback($data, array $job, string $status): ?WP_Error
+    {
+        if (! is_array($data)) {
+            return new WP_Error('invalid_payload');
+        }
+        $request_id = $data['requestId'] ?? null;
+        if ((! is_int($request_id) && ! is_string($request_id))
+            || ! preg_match('/^[1-9][0-9]*$/D', (string) $request_id)
+            || (string) $request_id !== (string) $job['request_id']
+            || ! is_string($data['externalReference'] ?? null)
+            || ! hash_equals($job['token'], $data['externalReference'])) {
+            return new WP_Error('invalid_correlation');
+        }
+        if ('error' === $status) {
+            if (! is_array($data['targetLanguages'] ?? null)
+                || ! in_array($job['target_language'], $data['targetLanguages'], true)
+                || ! is_int($data['errorCode'] ?? null) || $data['errorCode'] >= 0
+                || ! is_string($data['errorMessage'] ?? null) || trim($data['errorMessage']) === '') {
+                return new WP_Error('invalid_payload');
+            }
+        } elseif (($data['targetLanguage'] ?? null) !== $job['target_language']) {
+            return new WP_Error('invalid_correlation');
+        } elseif ('success' === $status
+            && (($data['outputFormat'] ?? null) !== 'html' || ! is_string($data['result'] ?? null))) {
+            return new WP_Error('invalid_payload');
+        }
+        return null;
     }
 
     /**
@@ -439,7 +497,7 @@ class RestController extends WP_REST_Controller
 
         if (is_array($data)) {
             if (isset($data['errorMessage']) && is_string($data['errorMessage'])) {
-                return $data['errorMessage'];
+                return sanitize_text_field(substr($data['errorMessage'], 0, 500));
             }
 
             if (isset($data['message']) && is_string($data['message'])) {
@@ -459,46 +517,12 @@ class RestController extends WP_REST_Controller
     private function extract_translation_content(WP_REST_Request $request)
     {
         $body         = $request->get_body();
-        $content_type = $request->get_header('content-type');
-
-        if (is_string($content_type) && false !== stripos($content_type, 'application/json')) {
+        if ($request->is_json_content_type()) {
             $data = json_decode($body, true);
-
-            if (! is_array($data)) {
-                return new WP_Error('rrze_webt_invalid_payload', __('WEB-T callback payload is not valid JSON.', 'rrze-webt'));
+            if (! is_array($data) || ! is_string($data['result'] ?? null)) {
+                return new WP_Error('rrze_webt_missing_content', __('WEB-T callback payload is missing the translated result.', 'rrze-webt'));
             }
-
-            $document = $data['document'] ?? $data['translatedDocument'] ?? null;
-
-            if (is_array($document)) {
-                $encoded = $document['content'] ?? '';
-
-                if (! is_string($encoded) || '' === trim($encoded)) {
-                    return new WP_Error('rrze_webt_missing_content', __('WEB-T callback payload is missing the translated content.', 'rrze-webt'));
-                }
-
-                $decoded = base64_decode($encoded, true);
-
-                if (false === $decoded) {
-                    return new WP_Error('rrze_webt_invalid_base64', __('WEB-T callback content is not valid base64.', 'rrze-webt'));
-                }
-
-                return $this->split_translated_document($decoded);
-            }
-
-            if (isset($data['content']) && is_string($data['content'])) {
-                $decoded = base64_decode($data['content'], true);
-
-                if (false !== $decoded) {
-                    return $this->split_translated_document($decoded);
-                }
-
-                return $this->split_translated_document($data['content']);
-            }
-
-            if (isset($data['translation']) && is_string($data['translation'])) {
-                return $this->split_translated_document($data['translation']);
-            }
+            $body = $data['result'];
         }
 
         if ('' === trim($body)) {
@@ -507,11 +531,12 @@ class RestController extends WP_REST_Controller
 
         $decoded = base64_decode($body, true);
 
-        if (false !== $decoded) {
-            return $this->split_translated_document($decoded);
+        if (false === $decoded || trim($decoded) === '' || wp_check_invalid_utf8($decoded, true) !== $decoded) {
+            return new WP_Error('rrze_webt_invalid_base64', __('WEB-T callback content is not a valid Base64-encoded UTF-8 document.', 'rrze-webt'));
         }
 
-        return $this->split_translated_document($body);
+        // Raw Base64 remains accepted for v1 jobs submitted before the upgrade.
+        return $this->split_translated_document($decoded);
     }
 
     /**

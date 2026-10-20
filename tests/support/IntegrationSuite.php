@@ -159,6 +159,7 @@ final class IntegrationSuite
             'simulator_v2' => 'V2 fixtures accept a valid request and reject legacy inputs.',
             'pending_job' => 'An accepted request stays pending until delivery is released.',
             'legacy_delivery' => 'A delayed legacy delivery stores the translated blocks.',
+            'v2_requires_json' => 'New v2 jobs reject legacy deliveries without a JSON envelope.',
             'remote_failure' => 'A failure notification records the service error.',
             'malformed_json' => 'Malformed JSON fails without changing the source post.',
             'unauthorized' => 'Invalid credentials produce an authentication error.',
@@ -168,6 +169,13 @@ final class IntegrationSuite
             'anonymous_jobs' => 'Anonymous users cannot read a post’s translation history.',
             'client_v2' => 'The real client submits a valid v2 document request.',
             'delivery_v2' => 'A v2 delivery yields translated HTML, not raw JSON.',
+            'success_notification' => 'Notifications before or after delivery do not replace content.',
+            'invalid_delivery' => 'Invalid Base64, empty results and wrong formats cannot write a post.',
+            'invalid_acknowledgement' => 'Malformed acknowledgements cannot create phantom pending jobs.',
+            'provider_errors' => 'Provider validation, authentication and quota errors remain failures.',
+            'endpoint_validation' => 'Unsafe or known v1 endpoints fail before sending credentials.',
+            'locale_codes' => 'WordPress locales become two-letter API and job language codes.',
+            'failure_correlation' => 'Unrelated or malformed failure notifications leave jobs unchanged.',
             'early_callback' => 'Delivery before the submission response is retained.',
             'duplicate_callback' => 'A duplicate delivery has no additional post-write effects.',
             'repeated_submit' => 'Repeated submissions do not create parallel active jobs.',
@@ -311,7 +319,7 @@ final class IntegrationSuite
     }
 
     /**
-     * Submit a legacy request and verify that a pending job was actually stored.
+     * Submit a v2 request and verify that a pending job was actually stored.
      *
      * @return array<string,mixed> Receipt used to release the callback.
      */
@@ -339,7 +347,7 @@ final class IntegrationSuite
     }
 
     /**
-     * Seed a pending job to test v2 reception independently of the broken sender.
+     * Seed a pending job to test reception independently of submission.
      *
      * @return array<string,mixed> Receipt corresponding to the seeded job.
      */
@@ -350,6 +358,7 @@ final class IntegrationSuite
         (new JobStore())->create_job([
             'token' => $token,
             'request_id' => (string) $id,
+            'api_version' => $this->simulator->protocol === 'v2' ? 2 : 1,
             'post_id' => $this->post_id,
             'source_language' => 'DE',
             'target_language' => 'EN',
@@ -361,6 +370,7 @@ final class IntegrationSuite
             'targetLanguage' => 'EN',
             'success' => rest_url('rrze-webt/v1/callback/' . $token . '/success'),
             'failure' => rest_url('rrze-webt/v1/callback/' . $token . '/error'),
+            'notification' => rest_url('rrze-webt/v1/callback/' . $token . '/notification'),
         ];
     }
 
@@ -435,13 +445,14 @@ final class IntegrationSuite
     }
 
     /**
-     * Exercise request, delayed callback, persistence and polling in legacy mode.
+     * Receive an outstanding v1 job after upgrading the sender to v2.
      *
      * @return bool Whether the real job exposes the exact translated block fixture.
      */
     private function legacy_delivery(): bool
     {
-        $receipt = $this->accepted();
+        $this->simulator->reset('legacy');
+        $receipt = $this->seed_job();
         $response = $this->simulator->deliver($receipt);
         $this->require_true($response->get_status() === 200, 'Legacy delivery was rejected.');
         $job = $this->request('GET', 'jobs/' . $this->post_id)->get_data()['jobs'][0];
@@ -451,14 +462,33 @@ final class IntegrationSuite
     }
 
     /**
-     * Exercise the v2 error notification using a job seeded before reception.
+     * Prevent a raw v1 callback from bypassing v2 envelope validation.
+     *
+     * @return bool Whether the v2 job rejects raw content but accepts its JSON delivery.
+     */
+    private function v2_requires_json(): bool
+    {
+        $receipt = $this->accepted();
+        $this->simulator->reset('legacy');
+        $response = $this->simulator->deliver($receipt);
+        if ($response->get_status() !== 400 || $this->job($receipt)['status'] !== 'pending'
+            || $this->post_updates !== 0) {
+            return false;
+        }
+        $this->simulator->reset('v2');
+        return $this->simulator->deliver($receipt)->get_status() === 200
+            && $this->job($receipt)['content'] === $this->simulator->fixture('translation.html');
+    }
+
+    /**
+     * Exercise v2 submission followed by a failure notification.
      *
      * @return bool Whether the error is retained without changing the source.
      */
     private function remote_failure(): bool
     {
         $this->simulator->reset('v2');
-        $receipt = $this->seed_job();
+        $receipt = $this->accepted();
         $response = $this->simulator->deliver($receipt, 'failure');
         $job = $this->job($receipt);
         return $response->get_status() === 200 && $job['status'] === 'failed'
@@ -484,13 +514,13 @@ final class IntegrationSuite
     }
 
     /**
-     * Simulate invalid credentials after the old Digest challenge.
+     * Simulate rejected Basic credentials without a Digest handshake or retries.
      *
      * @return bool Whether the client surfaces HTTP 401 without accepting a job.
      */
     private function unauthorized(): bool
     {
-        $this->simulator->reset('legacy', 'unauthorized');
+        $this->simulator->reset('v2', 'unauthorized');
         return $this->submit()->get_status() === 401 && $this->simulator->queue === [];
     }
 
@@ -501,7 +531,7 @@ final class IntegrationSuite
      */
     private function transport_timeout(): bool
     {
-        $this->simulator->reset('legacy', 'timeout');
+        $this->simulator->reset('v2', 'timeout');
         $response = $this->submit();
         return $response->get_status() >= 400
             && $response->get_data()['code'] === 'http_request_failed'
@@ -555,21 +585,202 @@ final class IntegrationSuite
         $this->simulator->reset('v2');
         $response = $this->submit();
         $this->require_true(count($this->simulator->requests) > 0, 'Client never reached the HTTP boundary.');
-        return $response->get_status() === 202 && count($this->simulator->queue) === 1;
+        return $response->get_status() === 202 && count($this->simulator->queue) === 1
+            && $this->simulator->requests === [['method' => 'POST', 'url' => Simulator::V2_URL, 'redirection' => 0]]
+            && $this->simulator->queue[0]['document'] === '<!--RRZE_WEBT_TITLE_START-->Lokaler Test<!--RRZE_WEBT_TITLE_END-->'
+                . '<!--RRZE_WEBT_CONTENT_START-->' . $this->simulator->fixture('source.html') . '<!--RRZE_WEBT_CONTENT_END-->'
+            && $this->simulator->queue[0]['filename'] === 'post-' . $this->post_id;
     }
 
     /**
-     * Exercise v2 delivery parsing separately from submission compatibility.
+     * Exercise v2 submission, delivery, persistence and polling together.
      *
      * @return bool Whether the stored result equals decoded translated HTML.
      */
     private function delivery_v2(): bool
     {
         $this->simulator->reset('v2');
-        $receipt = $this->seed_job();
+        $receipt = $this->accepted();
         $response = $this->simulator->deliver($receipt);
         $this->require_true($response->get_status() === 200, 'V2 fixture did not reach a receiving callback.');
-        return $this->job($receipt)['content'] === $this->simulator->fixture('translation.html');
+        $job = $this->request('GET', 'jobs/' . $this->post_id)->get_data()['jobs'][0];
+        return $job['status'] === 'completed' && $job['title'] === 'Local test'
+            && $job['content'] === $this->simulator->fixture('translation.html');
+    }
+
+    /**
+     * Receive completion notices on either side of the actual document delivery.
+     *
+     * @return bool Whether notices leave pending/completed jobs and post writes unchanged.
+     */
+    private function success_notification(): bool
+    {
+        $receipt = $this->accepted();
+        $notice = $this->simulator->deliver($receipt, 'notification');
+        if ($notice->get_status() !== 200 || $this->job($receipt)['status'] !== 'pending'
+            || $this->post_updates !== 0) {
+            return false;
+        }
+        $this->require_true($this->simulator->deliver($receipt)->get_status() === 200, 'Document delivery failed.');
+        $job = $this->job($receipt);
+        $updates = $this->post_updates;
+        $notice = $this->simulator->deliver($receipt, 'notification');
+        return $notice->get_status() === 200 && $this->job($receipt) === $job
+            && $this->post_updates === $updates;
+    }
+
+    /**
+     * Reject corrupted or non-HTML deliveries before any source content is written.
+     *
+     * @return bool Whether every invalid document is rejected.
+     */
+    private function invalid_delivery(): bool
+    {
+        foreach ([
+            ['result' => '%%%invalid%%%'],
+            ['result' => ''],
+            ['result' => ['unexpected' => 'array']],
+            ['result' => base64_encode(" \n")],
+            ['result' => base64_encode("\xff\xfe")],
+            ['outputFormat' => 'docx'],
+        ] as $overrides) {
+            $receipt = $this->seed_job();
+            $response = $this->simulator->deliver($receipt, 'success', $overrides);
+            if ($response->get_status() !== 400 || $this->job($receipt)['status'] === 'completed') {
+                return false;
+            }
+        }
+        return $this->post_updates === 0;
+    }
+
+    /**
+     * Reject invalid IDs, while retaining large valid identifiers without rounding.
+     *
+     * @return bool Whether invalid acknowledgements create no job and a large ID survives.
+     */
+    private function invalid_acknowledgement(): bool
+    {
+        foreach ([
+            '', 'not JSON', '{"requestId":', '481001', [],
+            ['requestId' => null], ['requestId' => ''], ['requestId' => 0],
+            ['requestId' => -1], ['requestId' => true], ['requestId' => []],
+            ['requestId' => 12.5], ['requestId' => '12e3'],
+            ['requestId' => "123\n"], ['translation' => 'not an acknowledgement'],
+        ] as $body) {
+            $this->simulator->reset();
+            $this->simulator->submission_response = ['status' => 200, 'body' => $body];
+            $response = $this->submit();
+            if ($response->get_status() !== 502 || (new JobStore())->get_jobs_for_post($this->post_id) !== []) {
+                return false;
+            }
+        }
+        $this->simulator->submission_response = ['status' => 200, 'body' => '{"requestId":9223372036854775808}'];
+        $response = $this->submit();
+        $jobs = (new JobStore())->get_jobs_for_post($this->post_id);
+        return $response->get_status() === 202 && count($jobs) === 1
+            && $response->get_data()['jobId'] === '9223372036854775808'
+            && $jobs[0]['request_id'] === '9223372036854775808';
+    }
+
+    /**
+     * Keep provider failures distinct from acknowledgements and avoid response leaks.
+     *
+     * @return bool Whether failures retain an error status without creating local jobs.
+     */
+    private function provider_errors(): bool
+    {
+        foreach ([
+            [400, ['errorCode' => -10704, 'errorMessage' => 'SOURCE_LANGUAGE_MISSING'], 400, 'SOURCE_LANGUAGE_MISSING'],
+            [429, ['errorCode' => -11200, 'errorMessage' => 'QUOTA_EXCEEDED'], 429, 'QUOTA_EXCEEDED'],
+            [503, '<html>private document echo</html>', 503, ''],
+            [302, '', 502, ''],
+            [200, ['requestId' => 481001, 'errorCode' => -10704, 'errorMessage' => 'SOURCE_LANGUAGE_MISSING'], 502, 'SOURCE_LANGUAGE_MISSING'],
+        ] as [$status, $body, $expected_status, $message]) {
+            $this->simulator->reset();
+            $this->simulator->submission_response = ['status' => $status, 'body' => $body];
+            $response = $this->submit();
+            $actual_message = $response->get_data()['message'] ?? '';
+            if ($response->get_status() !== $expected_status
+                || ! str_contains($actual_message, $message)
+                || str_contains($actual_message, 'private document echo')
+                || (is_array($body) && ($response->get_data()['data']['remote_code'] ?? null) !== $body['errorCode'])
+                || count($this->simulator->requests) !== 1
+                || (new JobStore())->get_jobs_for_post($this->post_id) !== []) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Refuse cleartext credentials and known legacy EU endpoints before HTTP dispatch.
+     *
+     * @return bool Whether unsafe configurations produce local errors only.
+     */
+    private function endpoint_validation(): bool
+    {
+        foreach ([
+            'http://webt.invalid/etranslation/api/askTranslate',
+            'https://username:password@webt.invalid/etranslation/api/askTranslate',
+            Simulator::V2_URL . '#fragment',
+            'https://webgate.ec.europa.eu/etranslation/si/translate',
+            '/etranslation/api/askTranslate',
+        ] as $endpoint) {
+            $this->simulator->reset();
+            $this->simulator->endpoint = $endpoint;
+            if ($this->submit()->get_status() < 400 || $this->simulator->requests !== []) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Submit WordPress-style locales and compare payload languages with stored jobs.
+     *
+     * @return bool Whether locale suffixes are removed consistently at both boundaries.
+     */
+    private function locale_codes(): bool
+    {
+        $response = $this->request('POST', 'translate', [
+            'post_id' => $this->post_id,
+            'title' => 'Lokaler Test',
+            'content' => $this->simulator->fixture('source.html'),
+            'source_language' => 'de_DE',
+            'target_language' => 'en_US',
+        ]);
+        if ($response->get_status() !== 202 || count($this->simulator->queue) !== 1) {
+            return false;
+        }
+        $receipt = $this->simulator->queue[0];
+        $job = $this->job($receipt);
+        return $receipt['sourceLanguage'] === 'DE' && $receipt['targetLanguage'] === 'EN'
+            && $job['source_language'] === 'DE' && $job['target_language'] === 'EN'
+            && $this->simulator->deliver($receipt)->get_status() === 200;
+    }
+
+    /**
+     * Reject failures for another job or language and malformed failure envelopes.
+     *
+     * @return bool Whether invalid failures leave the pending job and source unchanged.
+     */
+    private function failure_correlation(): bool
+    {
+        $receipt = $this->accepted();
+        $job = $this->job($receipt);
+        foreach ([
+            ['requestId' => 999999],
+            ['externalReference' => wp_generate_uuid4()],
+            ['targetLanguages' => ['FR']],
+            ['errorCode' => 'not a code'],
+            ['errorMessage' => []],
+        ] as $overrides) {
+            $response = $this->simulator->deliver($receipt, 'failure', $overrides);
+            if ($response->get_status() !== 400 || $this->job($receipt) !== $job) {
+                return false;
+            }
+        }
+        return $this->post_updates === 0;
     }
 
     /**
@@ -579,7 +790,7 @@ final class IntegrationSuite
      */
     private function early_callback(): bool
     {
-        $this->simulator->reset('legacy', 'early');
+        $this->simulator->reset('v2', 'early');
         $response = $this->submit();
         $this->require_true($response->get_status() === 202 && count($this->simulator->queue) === 1, 'Early scenario submission failed.');
         return $this->simulator->callback_statuses === [200]
@@ -620,7 +831,7 @@ final class IntegrationSuite
      */
     private function trace_timeout(): bool
     {
-        $this->simulator->reset('legacy', 'timeout');
+        $this->simulator->reset('v2', 'timeout');
         $this->require_true($this->submit()->get_status() >= 400, 'Timeout fixture did not return an error.');
         return count((new JobStore())->get_jobs_for_post($this->post_id)) === 1;
     }
@@ -647,7 +858,8 @@ final class IntegrationSuite
         $receipt = $this->accepted();
         $id = $this->simulator->deliver($receipt, 'success', ['requestId' => 999999]);
         $language = $this->simulator->deliver($receipt, 'success', ['targetLanguage' => 'FR']);
-        return $id->get_status() >= 400 && $language->get_status() >= 400
+        $reference = $this->simulator->deliver($receipt, 'success', ['externalReference' => wp_generate_uuid4()]);
+        return $id->get_status() >= 400 && $language->get_status() >= 400 && $reference->get_status() >= 400
             && $this->job($receipt)['status'] !== 'completed' && $this->post_updates === 0;
     }
 

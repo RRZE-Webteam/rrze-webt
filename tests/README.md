@@ -83,22 +83,31 @@ die Prüfung selbst bleibt bestehen.
 Der Bericht gibt außerdem an, ob eigene Entwurfsseiten zurückgeblieben sind.
 PHP-Deprecation-Meldungen anderer installierter Plugins werden nicht unterdrückt.
 
-## Zwei Protokolle mit unterschiedlichen Aufgaben
+## Protokolle und Stand nach Schritt 2
 
-**Legacy** stellt den bisher verwendeten Ablauf nach: Digest-Challenge, Annahme
-und eine spätere Base64-Dokumentlieferung. Damit lassen sich Jobs, Timeouts und
-Callbacks untersuchen, obwohl der aktuelle Sender noch kein v2 spricht. Der
-Simulator prüft dabei keine vollständige kryptografische Digest-Authentifizierung.
+**V2** ist jetzt der Standard für alle neuen Aufträge und die Job-Tests. Geprüft
+werden die exakte `askTranslate`-Adresse, eine einzelne POST-Anfrage mit Basic
+Authentication, `documentToTranslate.document`, `deliveries.http`, getrennte
+Erfolgs- und Fehlerbenachrichtigungen und die JSON-Rücklieferung mit `result`.
+Der Sender verwendet ausschließlich lokale Testzugangsdaten.
 
-**V2** prüft den für das Plugin relevanten Teil des neuen Vertrags: exakte
-`askTranslate`-Adresse, Basic Authentication mit Testzugangsdaten, verschachteltes
-`documentToTranslate.document`, `deliveries.http`, Fehlerbenachrichtigung und
-JSON-Rücklieferung mit `result`. Alte Felder, falsche Pfade und falsche
-Authentifizierung werden abgewiesen. Das ist kein vollständiger EU-Server und
-kein allgemeiner OpenAPI-Validator.
+**Legacy** dient noch dem Empfang eines vor dem Upgrade angelegten Auftrags.
+Neue v2-Jobs müssen die JSON-Prüfung durchlaufen; rohe v1-Rücklieferungen werden
+für diese Jobs abgewiesen. Der historische Digest-Simulator bleibt als
+Referenz vorhanden, wird aber nicht mehr vom produktiven Sender verwendet.
 
-Die v2-Empfangstests legen einen passenden Auftrag direkt im echten `JobStore` an.
-So verdeckt ein Fehler im Sender nicht zusätzlich die Fehler im Empfänger.
+Die regulären Liefer- und Fehlertests reichen jetzt vom echten Sender bis zum
+Callback und zur gespeicherten Job-Antwort. Für gezielte Parser- und
+Berechtigungsprüfungen werden außerdem Aufträge direkt im echten `JobStore`
+angelegt. Der Simulator ist weiterhin ein fokussierter Test des vom Plugin
+verwendeten Vertrags, kein vollständiger EU-Server oder OpenAPI-Validator.
+
+Behoben und aus der Liste bekannter Fehler entfernt sind `client_v2`,
+`delivery_v2`, `unknown_payload` und `callback_correlation`. Die Prüfungen selbst
+bleiben bestehen. Zusätzliche Fälle prüfen Erfolgsmeldungen vor und nach der
+Dateilieferung, ungültiges Base64, leere Ergebnisse, falsche Dateiformate,
+ungültige und sehr große Auftragsnummern, Anbieterfehler, unsichere oder alte
+Endpunkte, WordPress-Locale-Codes und falsch zugeordnete Fehlerbenachrichtigungen.
 
 Quellen des simulierten Formats, geprüft am 20. Oktober 2026:
 

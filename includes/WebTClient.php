@@ -7,122 +7,31 @@ defined('ABSPATH') || exit;
 use WP_Error;
 
 /**
- * Client class for interacting with the WEB-T translation API.
- * 
+ * Submit asynchronous HTML document translations to eTranslation REST v2.
+ *
  * @package RRZE\WebT
  */
 class WebTClient
 {
-    /**
-     * Markers used to delineate title in the translation document.
-     * 
-     * @var string
-     */
-    private const TITLE_START  = '<!--RRZE_WEBT_TITLE_START-->';
+    /** @var string Title boundary in the submitted document. */
+    private const TITLE_START = '<!--RRZE_WEBT_TITLE_START-->';
 
-    /**
-     * Markers used to delineate title in the translation document.
-     * @var string
-     */
-    private const TITLE_END    = '<!--RRZE_WEBT_TITLE_END-->';
+    /** @var string Title boundary in the submitted document. */
+    private const TITLE_END = '<!--RRZE_WEBT_TITLE_END-->';
 
-    /**
-     * Markers used to delineate content in the translation document.
-     * 
-     * @var string
-     */
+    /** @var string Content boundary in the submitted document. */
     private const CONTENT_START = '<!--RRZE_WEBT_CONTENT_START-->';
 
-    /**
-     * Markers used to delineate content in the translation document.
-     * 
-     * @var string
-     */
-    private const CONTENT_END   = '<!--RRZE_WEBT_CONTENT_END-->';
+    /** @var string Content boundary in the submitted document. */
+    private const CONTENT_END = '<!--RRZE_WEBT_CONTENT_END-->';
 
-    /**
-     * @var Settings
-     */
+    /** @var Settings API configuration and credentials. */
     private Settings $settings;
 
     /**
-     * Get the error map for WEB-T error codes.
-     * 
-     * @return array<int, string> Associative array mapping error codes to messages.
-     */
-    private static function get_error_map(): array
-    {
-        return [
-            -20000 => __('Source language not specified', 'rrze-webt'),
-            -20001 => __('Invalid source language', 'rrze-webt'),
-            -20002 => __('Target language(s) not specified', 'rrze-webt'),
-            -20003 => __('Invalid target language(s)', 'rrze-webt'),
-            -20004 => 'DEPRECATED',
-            -20005 => __('Caller information not specified', 'rrze-webt'),
-            -20006 => __('Missing application name', 'rrze-webt'),
-            -20007 => __('Application not authorized to access the service', 'rrze-webt'),
-            -20008 => __('Bad format for ftp address', 'rrze-webt'),
-            -20009 => __('Bad format for sftp address', 'rrze-webt'),
-            -20010 => __('Bad format for http address', 'rrze-webt'),
-            -20011 => __('Bad format for email address', 'rrze-webt'),
-            -20012 => __('Translation request must be text type, document path type or document base64 type and not several at a time', 'rrze-webt'),
-            -20013 => __('Language pair not supported by the domain', 'rrze-webt'),
-            -20014 => __('Username parameter not specified', 'rrze-webt'),
-            -20015 => __('Extension invalid compared to the MIME type', 'rrze-webt'),
-            -20016 => 'DEPRECATED',
-            -20017 => __('Username parameter too long', 'rrze-webt'),
-            -20018 => __('Invalid output format', 'rrze-webt'),
-            -20019 => __('Institution parameter too long', 'rrze-webt'),
-            -20020 => __('Department number too long', 'rrze-webt'),
-            -20021 => __('Text to translate too long', 'rrze-webt'),
-            -20022 => __('Too many FTP destinations', 'rrze-webt'),
-            -20023 => __('Too many SFTP destinations', 'rrze-webt'),
-            -20024 => __('Too many HTTP destinations', 'rrze-webt'),
-            -20025 => __('Missing destination', 'rrze-webt'),
-            -20026 => __('Bad requester callback protocol', 'rrze-webt'),
-            -20027 => __('Bad error callback protocol', 'rrze-webt'),
-            -20028 => __('Concurrency quota exceeded', 'rrze-webt'),
-            -20029 => __('Document format not supported', 'rrze-webt'),
-            -20030 => __('Text to translate is empty', 'rrze-webt'),
-            -20031 => __('Missing text or document to translate', 'rrze-webt'),
-            -20032 => __('Email address too long', 'rrze-webt'),
-            -20033 => __('Cannot read stream', 'rrze-webt'),
-            -20034 => __('Output format not supported', 'rrze-webt'),
-            -20035 => __('Email destination tag is missing or empty', 'rrze-webt'),
-            -20036 => __('HTTP destination tag is missing or empty', 'rrze-webt'),
-            -20037 => __('FTP destination tag is missing or empty', 'rrze-webt'),
-            -20038 => __('SFTP destination tag is missing or empty', 'rrze-webt'),
-            -20039 => __('Document to translate tag is missing or empty', 'rrze-webt'),
-            -20040 => __('Format tag is missing or empty', 'rrze-webt'),
-            -20041 => __('The content is missing or empty', 'rrze-webt'),
-            -20042 => __('Source language defined in TMX file differs from request', 'rrze-webt'),
-            -20043 => __('Source language defined in XLIFF file differs from request', 'rrze-webt'),
-            -20044 => __("Output format is not available when quality estimate is requested. It should be blank or 'xslx'", 'rrze-webt'),
-            -20045 => __('Quality estimate is not available for text snippet', 'rrze-webt'),
-            -20046 => __('Document too big (>20Mb)', 'rrze-webt'),
-            -20047 => __('Quality estimation not available', 'rrze-webt'),
-            -40010 => __('Too many segments to translate', 'rrze-webt'),
-            -80004 => __('Cannot store notification file at specified FTP address', 'rrze-webt'),
-            -80005 => __('Cannot store notification file at specified SFTP address', 'rrze-webt'),
-            -80006 => __('Cannot store translated file at specified FTP address', 'rrze-webt'),
-            -80007 => __('Cannot store translated file at specified SFTP address', 'rrze-webt'),
-            -90000 => __('Cannot connect to FTP', 'rrze-webt'),
-            -90001 => __('Cannot retrieve file at specified FTP address', 'rrze-webt'),
-            -90002 => __('File not found at specified address on FTP', 'rrze-webt'),
-            -90007 => __('Malformed FTP address', 'rrze-webt'),
-            -90012 => __('Cannot retrieve file content on SFTP', 'rrze-webt'),
-            -90013 => __('Cannot connect to SFTP', 'rrze-webt'),
-            -90014 => __('Cannot store file at specified FTP address', 'rrze-webt'),
-            -90015 => __('Cannot retrieve file content on SFTP', 'rrze-webt'),
-            -90016 => __('Cannot retrieve file at specified SFTP address', 'rrze-webt'),
-        ];
-    }
-
-    /**
-     * Constructor.
-     * 
-     * @param Settings $settings Settings instance for configuration and credentials.
-     * @return void
+     * Construct the client without making any external requests.
+     *
+     * @param Settings $settings API configuration and credentials.
      */
     public function __construct(Settings $settings)
     {
@@ -130,286 +39,141 @@ class WebTClient
     }
 
     /**
-     * Sends the content to the WEB-T API and either returns the translation or queues a job.
-     * 
-     * @param string $content         The content to translate (HTML).
-     * @param string $target_language The target language code (e.g. "EN").
-     * @param string $source_language The source language code (e.g. "DE").
-     * @param int    $post_id         The related post ID (for logging and filters).
-     * @param array  $callbacks       Optional associative array with 'success' and 'error' callback URLs.
-     * @param string $client_token    Optional client token to associate with the request.
-     * @param string $title          Optional title to translate (if different from post title).
-     * @return array|string|WP_Error Array with 'title' and 'content' keys on success, WP_Error on failure, or WP_Error with 'rrze_webt_async_job' code for queued jobs.
+     * Submit a document; v2 returns an acknowledgement, never a translation.
+     *
+     * The existing rrze_webt_async_job result convention is retained for callers.
+     * Translated content is delivered separately to the callback controller.
+     *
+     * @param string $content HTML content to translate.
+     * @param string $target_language Target language or WordPress locale.
+     * @param string $source_language Source language or locale; empty uses the site locale.
+     * @param int    $post_id Related WordPress post ID.
+     * @param array  $callbacks Delivery URL in success, failure URL in error and optional notification URL.
+     * @param string $client_token Client reference echoed by the service in callbacks.
+     * @param string $title Title to translate; empty uses the stored post title.
+     * @return WP_Error An rrze_webt_async_job acknowledgement with request_id, or a failure.
      */
-    public function translate(string $content, string $target_language, string $source_language = '', int $post_id = 0, array $callbacks = [], string $client_token = '', string $title = '')
+    public function translate(string $content, string $target_language, string $source_language = '', int $post_id = 0, array $callbacks = [], string $client_token = '', string $title = ''): WP_Error
     {
         if (! $this->settings->has_valid_credentials()) {
-            return new WP_Error('rrze_webt_missing_credentials', __('Please configure the WEB-T application name and password first.', 'rrze-webt'));
+            return new WP_Error('rrze_webt_missing_credentials', __('Please configure the WEB-T API URL, application name and password first.', 'rrze-webt'));
         }
 
-        $endpoint_raw     = trim($this->settings->get_api_url());
-        $endpoint         = rtrim($endpoint_raw, '/');
-        $application_name = $this->settings->get_application_name();
-        $password         = $this->settings->get_password();
-
-        $translate_url = $this->resolve_translate_endpoint($endpoint);
-        if ('' === $translate_url) {
-            return new WP_Error('rrze_webt_missing_endpoint', __('The WEB-T API URL is not configured.', 'rrze-webt'));
+        // The setting is the full endpoint. Appending /translate breaks askTranslate.
+        $endpoint = trim($this->settings->get_api_url());
+        $parts = wp_parse_url($endpoint);
+        if (! is_array($parts) || strtolower($parts['scheme'] ?? '') !== 'https'
+            || empty($parts['host']) || isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])) {
+            return new WP_Error('rrze_webt_invalid_endpoint', __('The eTranslation REST v2 endpoint must be a full HTTPS URL without embedded credentials or a fragment.', 'rrze-webt'));
+        }
+        if (strtolower($parts['host']) === 'webgate.ec.europa.eu'
+            && str_starts_with($parts['path'] ?? '', '/etranslation/si')) {
+            return new WP_Error('rrze_webt_legacy_endpoint', __('Please update the API URL to https://language-tools.ec.europa.eu/etranslation/api/askTranslate for eTranslation REST v2.', 'rrze-webt'));
+        }
+        if (empty($callbacks['success']) || empty($callbacks['error'])) {
+            return new WP_Error('rrze_webt_missing_callbacks', __('Document translation requires delivery and failure callback URLs.', 'rrze-webt'));
         }
 
         $target_language_full = $this->normalize_language_code($target_language);
         $source_language_full = $this->determine_source_language($source_language);
-
         $target_language = $this->reduce_language_code($target_language_full);
-        $source_language = $source_language_full ? $this->reduce_language_code($source_language_full) : '';
+        $source_language = $this->reduce_language_code($source_language_full);
+        if (! preg_match('/^[A-Z]{2}$/D', $source_language) || ! preg_match('/^[A-Z]{2}$/D', $target_language)) {
+            return new WP_Error('rrze_webt_invalid_language', __('Please select valid source and target languages.', 'rrze-webt'));
+        }
 
-        $title_for_translation = '' !== $title ? $title : get_the_title($post_id);
-        $document              = $this->compose_translation_document($title_for_translation, $content);
-
+        $document = $this->compose_translation_document('' !== $title ? $title : get_the_title($post_id), $content);
         $document_format = apply_filters('rrze_webt_document_format', 'html', $post_id);
-        $filename        = apply_filters(
-            'rrze_webt_document_filename',
-            sprintf('post-%d.%s', $post_id ?: time(), $document_format),
-            $post_id,
-            $document_format
-        );
-
+        $filename = apply_filters('rrze_webt_document_filename', sprintf('post-%d', $post_id ?: time()), $post_id, $document_format);
         $payload = [
-            'documentToTranslateBase64' => [
-                'content'  => base64_encode($document),
-                'format'   => $document_format,
-                'filename' => $filename,
+            'documentToTranslate' => [
+                'document' => [
+                    'content' => base64_encode($document),
+                    'format' => $document_format,
+                    'filename' => $filename,
+                ],
             ],
-            'targetLanguages'   => [$target_language],
-            'domain'            => apply_filters('rrze_webt_domain', 'GEN', $post_id),
-            'callerInformation' => [
-                'application' => $application_name,
-            ],
-            'sourceLanguage'    => $source_language,
+            'sourceLanguage' => $source_language,
+            'targetLanguages' => [$target_language],
+            'domain' => apply_filters('rrze_webt_domain', 'GEN', $post_id),
+            'deliveries' => ['http' => $callbacks['success']],
+            'notifications' => ['failure' => ['http' => $callbacks['error']]],
         ];
-
-        if (! empty($callbacks['success'])) {
-            $payload['destinations'] = [
-                'httpDestinations' => [$callbacks['success']],
-            ];
+        if (! empty($callbacks['notification'])) {
+            $payload['notifications']['success'] = ['http' => $callbacks['notification']];
         }
-
-        if (! empty($callbacks['error'])) {
-            $payload['errorCallback'] = $callbacks['error'];
-        }
-
-        if ($client_token) {
-            $payload['customParameters'] = [
-                'clientToken' => $client_token,
-            ];
+        if ($client_token !== '') {
+            $payload['callerInformation'] = ['externalReference' => $client_token];
         }
 
         /**
-         * Filter the payload before it is sent to the WEB-T API.
+         * Filter the REST v2 request payload before JSON encoding.
          *
-         * @param array  $payload         The payload used in the request.
-         * @param string $content         The original post content.
-         * @param string $target_language Target language code.
-         * @param string $source_language Source language code.
-         * @param int    $post_id         Related post ID.
+         * @param array  $payload REST v2 document request.
+         * @param string $content Original post content.
+         * @param string $target_language_full Normalized target locale.
+         * @param string $source_language_full Normalized source locale.
+         * @param int    $post_id Related post ID.
          */
         $payload = apply_filters('rrze_webt_request_payload', $payload, $content, $target_language_full, $source_language_full, $post_id);
-
-        // Allow custom timeout via filter (default 20 seconds)
-        $http_timeout = (int) apply_filters('rrze_webt_http_timeout', 20);
-        $sslverify    = (bool) apply_filters('rrze_webt_sslverify', true);
-        $httpversion  = (string) apply_filters('rrze_webt_httpversion', '1.1');
-        $force_tls12  = (bool) apply_filters('rrze_webt_force_tls12', true);
-        $force_ipv4   = (bool) apply_filters('rrze_webt_force_ipv4', true);
-        $curl_overrides = $this->build_curl_overrides($force_ipv4, $force_tls12);
-
+        $body = wp_json_encode($payload);
+        if ($body === false) {
+            return new WP_Error('rrze_webt_invalid_request', __('The translation request could not be encoded as JSON.', 'rrze-webt'));
+        }
         $request_args = [
-            'method'      => 'POST',
-            'headers'     => [
-                'Content-Type' => 'application/json',
-                'Accept'       => 'application/json',
-                'Connection'   => 'close',
-                // Avoid "Expect: 100-continue" proxy edge cases.
-                'Expect'       => '',
-            ],
-            'body'        => wp_json_encode($payload),
-            'timeout'     => $http_timeout,
-            'redirection' => 5,
-            'sslverify'   => $sslverify,
-            'httpversion' => $httpversion ?: '1.1',
-            'curl'        => $curl_overrides,
+            'method' => 'POST',
+            'headers' => ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+            'body' => $body,
+            'timeout' => max(1, (int) apply_filters('rrze_webt_http_timeout', 20)),
+            'redirection' => 0,
+            'sslverify' => (bool) apply_filters('rrze_webt_sslverify', true),
+            'httpversion' => (string) apply_filters('rrze_webt_httpversion', '1.1'),
         ];
-
         /**
-         * Filter the request arguments before dispatch.
+         * Filter the request arguments before authentication is added.
          *
-         * @param array  $request_args The HTTP request arguments.
-         * @param array  $payload      The JSON payload containing the translation request.
-         * @param string $endpoint     The API endpoint URL.
+         * @param array  $request_args WordPress HTTP arguments.
+         * @param array  $payload REST v2 request payload.
+         * @param string $endpoint Exact configured endpoint URL.
          */
         $request_args = apply_filters('rrze_webt_request_args', $request_args, $payload, $endpoint);
-
-        $response = $this->dispatch_request_with_digest($translate_url, $request_args, $application_name, $password);
-
+        $request_args['headers']['Authorization'] = 'Basic ' . base64_encode($this->settings->get_application_name() . ':' . $this->settings->get_password());
+        // Do not forward Basic credentials or the document to a redirected endpoint.
+        $request_args['redirection'] = 0;
+        $response = wp_remote_request($endpoint, $request_args);
         if (is_wp_error($response)) {
             return $response;
         }
 
-        $status_code = (int) wp_remote_retrieve_response_code($response);
-        $body        = wp_remote_retrieve_body($response);
-
-        if ($status_code < 200 || $status_code >= 300) {
-            $message = $this->describe_api_error($body);
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true, 512, JSON_BIGINT_AS_STRING);
+        $error_data = ['status' => $status >= 400 && $status <= 599 ? $status : 502, 'remote_status' => $status];
+        if (is_array($data) && is_int($data['errorCode'] ?? null)) {
+            $error_data['remote_code'] = $data['errorCode'];
+        }
+        if ($status < 200 || $status >= 300) {
             return new WP_Error(
                 'rrze_webt_http_error',
                 sprintf(
-                    /* translators: %1$d: HTTP status code, %2$s: response body */
+                    /* translators: %1$d: HTTP status, %2$s: provider error description. */
                     __('The WEB-T API returned an unexpected status code (%1$d): %2$s', 'rrze-webt'),
-                    $status_code,
-                    $message
+                    $status,
+                    $this->describe_api_error($data)
                 ),
-                [
-                    'status' => $status_code,
-                    'body'   => $body,
-                ]
+                $error_data
             );
         }
-
-        $data = json_decode($body, true);
-
-        if (is_array($data)) {
-            if (isset($data['translation']) || isset($data['translations'])) {
-                $document = $this->extract_translation_document($data);
-
-                if (is_wp_error($document)) {
-                    return $document;
-                }
-
-                $segments = $this->split_translated_document($document);
-
-                return apply_filters('rrze_webt_translation_result', $segments, $data);
-            }
-
-            if (isset($data['requestId'])) {
-                $request_id = (string) $data['requestId'];
-
-                if ('' !== $request_id && '-' === $request_id[0]) {
-                    $code    = (int) $request_id;
-                    $message = $this->lookup_error_message($code) ?: __('The WEB-T service rejected the translation request.', 'rrze-webt');
-
-                    return new WP_Error('rrze_webt_remote_error', $message, ['body' => $body, 'code' => $code, 'response' => $data]);
-                }
-
-                return new WP_Error(
-                    'rrze_webt_async_job',
-                    '',
-                    [
-                        'request_id' => $request_id,
-                    ]
-                );
-            }
+        if (is_array($data) && array_key_exists('errorCode', $data)) {
+            return new WP_Error('rrze_webt_remote_error', $this->describe_api_error($data), $error_data);
+        }
+        $request_id = is_array($data) ? ($data['requestId'] ?? null) : null;
+        if ((! is_int($request_id) && ! is_string($request_id))
+            || ! preg_match('/^[1-9][0-9]*$/D', (string) $request_id)) {
+            return new WP_Error('rrze_webt_invalid_response', __('The eTranslation service did not return a valid request ID.', 'rrze-webt'), ['status' => 502]);
         }
 
-        $trimmed_body = trim($body);
-
-        if (is_numeric($trimmed_body)) {
-            $numeric_id = (int) $trimmed_body;
-
-            if ($numeric_id > 0) {
-                return new WP_Error(
-                    'rrze_webt_async_job',
-                    '',
-                    [
-                        'request_id' => (string) $numeric_id,
-                    ]
-                );
-            }
-
-            $message = $this->lookup_error_message($numeric_id) ?: __('The WEB-T service rejected the translation request.', 'rrze-webt');
-
-            return new WP_Error('rrze_webt_remote_error', $message, ['body' => $body, 'code' => $numeric_id]);
-        }
-
-        if (isset($data['errorCode'])) {
-            $code    = (int) $data['errorCode'];
-            $message = $this->lookup_error_message($code) ?: ($data['message'] ?? $data['errorMessage'] ?? __('The WEB-T API reported an error.', 'rrze-webt'));
-            return new WP_Error('rrze_webt_remote_error', $message, ['body' => $body, 'code' => $code, 'response' => $data]);
-        }
-
-        if (! is_array($data)) {
-            return new WP_Error('rrze_webt_invalid_response', __('The WEB-T API returned an invalid response.', 'rrze-webt'), ['body' => $body]);
-        }
-
-        $document = $this->extract_translation_document($data);
-
-        if (is_wp_error($document)) {
-            return $document;
-        }
-
-        $segments = $this->split_translated_document($document);
-
-        /**
-         * Filter the translation returned by the WEB-T API.
-         *
-         * @param array $segments The translated segments (content and title).
-         * @param array $data     The decoded API response.
-         */
-        return apply_filters('rrze_webt_translation_result', $segments, $data);
-    }
-
-    /**
-     * Extracts the translation text from the API response data.
-     * 
-     * @param array $data The decoded API response data.
-     * @return string|WP_Error The extracted translation text, or WP_Error if not found
-     */
-    private function extract_translation_document(array $data)
-    {
-        $keys = ['translation', 'translatedText', 'result'];
-
-        foreach ($keys as $key) {
-            if (isset($data[$key]) && is_string($data[$key])) {
-                return $data[$key];
-            }
-        }
-
-        if (isset($data['translations']) && is_array($data['translations'])) {
-            $first = reset($data['translations']);
-
-            if (is_string($first)) {
-                return $first;
-            }
-
-            if (is_array($first)) {
-                foreach (['translation', 'translatedText', 'text'] as $inner_key) {
-                    if (isset($first[$inner_key]) && is_string($first[$inner_key])) {
-                        return $first[$inner_key];
-                    }
-                }
-            }
-        }
-
-        return new WP_Error('rrze_webt_missing_translation', __('The WEB-T API response did not include a translation.', 'rrze-webt'), ['response' => $data]);
-    }
-
-    /**
-     * Resolves the url of the translate endpoint based on the base API URL.
-     * 
-     * @param string $endpoint The base API URL.
-     * @return string The full URL of the translate endpoint.
-     */
-    private function resolve_translate_endpoint(string $endpoint): string
-    {
-        // Empty endpoint must not become a local WP-relative URL.
-        if ('' === $endpoint) {
-            return '';
-        }
-
-        if (preg_match('#/translate$#i', $endpoint)) {
-            return $endpoint;
-        }
-
-        return trailingslashit($endpoint) . 'translate';
+        return new WP_Error('rrze_webt_async_job', '', ['request_id' => (string) $request_id]);
     }
 
     /**
@@ -464,49 +228,6 @@ class WebTClient
     }
 
     /**
-     * Splits a translated document into title and content segments.
-     * 
-     * @param string $document The translated document containing markers.
-     * @return array Associative array with 'title' and 'content' keys.
-     */
-    private function split_translated_document(string $document): array
-    {
-        $title   = $this->extract_segment($document, self::TITLE_START, self::TITLE_END);
-        $content = $this->extract_segment($document, self::CONTENT_START, self::CONTENT_END);
-
-        if ('' === $content && '' === $title) {
-            $content = $document;
-        }
-
-        return [
-            'title'   => $title,
-            'content' => $content,
-        ];
-    }
-
-    /**
-     * Extracts a segment from the document between start and end markers.
-     * 
-     * @param string $document The full document text.
-     * @param string $start    The start marker.
-     * @param string $end      The end marker.
-     * @return string The extracted segment, or empty string if not found.
-     */
-    private function extract_segment(string $document, string $start, string $end): string
-    {
-        $start_pos = strpos($document, $start);
-        $end_pos   = strpos($document, $end);
-
-        if (false === $start_pos || false === $end_pos || $end_pos <= $start_pos) {
-            return '';
-        }
-
-        $segment = substr($document, $start_pos + strlen($start), $end_pos - ($start_pos + strlen($start)));
-
-        return trim($segment);
-    }
-
-    /**
      * Determines the source language code based on input or site locale.
      * 
      * @param string $source_language The provided source language code (may be empty).
@@ -532,376 +253,27 @@ class WebTClient
     }
 
     /**
-     * Dispatches an HTTP request with Digest authentication.
-     * 
-     * @param string $url      The request URL.
-     * @param array  $args     The request arguments (method, headers, body, etc.).
-     * @param string $username The username for authentication.
-     * @param string $password The password for authentication.
-     * @return array|WP_Error The response array on success, or WP_Error on failure
-     */
-    private function dispatch_request_with_digest(string $url, array $args, string $username, string $password)
-    {
-        $method = strtoupper($args['method'] ?? 'POST');
-
-        $challenge = $this->acquire_digest_challenge($url, $args);
-
-        if (is_wp_error($challenge)) {
-            return $challenge;
-        }
-
-        $auth_header = $this->build_digest_header(
-            $challenge['header'],
-            $url,
-            $method,
-            $username,
-            $password
-        );
-
-        if (is_wp_error($auth_header)) {
-            return $auth_header;
-        }
-
-        if (! isset($args['headers']) || ! is_array($args['headers'])) {
-            $args['headers'] = [];
-        }
-
-        $args['headers']['Authorization'] = $auth_header;
-        // Carry session cookie (required by "Proxy-support: Session-based-authentication")
-        if (! empty($challenge['jsessionid'])) {
-            $args['headers']['Cookie'] = 'JSESSIONID=' . $challenge['jsessionid'];
-        }
-        // Defensive (some proxies choke on Expect: 100-continue)
-        $args['headers']['Expect'] = '';
-
-        return wp_remote_request($url, $args);
-    }
-
-    /**
-     * Acquires the Digest authentication challenge from the server.
-     * 
-     * @param string $url    The request URL.
-     * @param array  $args   The original request arguments (for timeout, sslverify, etc.).
-     * @return array|WP_Error Associative array with 'header' and 'response' keys on success, or WP_Error on failure.
-     */
-    private function acquire_digest_challenge(string $url, array $args)
-    {
-        $timeout    = $args['timeout'] ?? (int) apply_filters('rrze_webt_http_timeout', 20);
-        $sslverify  = isset($args['sslverify']) ? (bool) $args['sslverify'] : (bool) apply_filters('rrze_webt_sslverify', true);
-        $httpversion = isset($args['httpversion']) ? (string) $args['httpversion'] : (string) apply_filters('rrze_webt_httpversion', '1.1');
-        $force_tls12  = (bool) apply_filters('rrze_webt_force_tls12', true);
-        $force_ipv4   = (bool) apply_filters('rrze_webt_force_ipv4', true);
-        $curl_overrides = $this->build_curl_overrides($force_ipv4, $force_tls12);
-
-        // Use GET to obtain WWW-Authenticate (some gateways return 405 for HEAD).
-        $handshake_args = [
-            'method'      => 'GET',
-            'timeout'     => (int) $timeout,
-            'sslverify'   => $sslverify,
-            'redirection' => 0,
-            'httpversion' => $httpversion ?: '1.1',
-            'headers'     => [
-                'Accept'     => 'application/json',
-                'Connection' => 'close',
-                'Expect'     => '',
-            ],
-            'curl'        => $curl_overrides,
-        ];
-
-        /**
-         * Filter the handshake arguments used to obtain the digest challenge.
-         *
-         * @param array  $handshake_args Handshake arguments.
-         * @param string $url            Request URL.
-         * @param array  $args           Original request arguments.
-         */
-        $handshake_args = apply_filters('rrze_webt_handshake_args', $handshake_args, $url, $args);
-
-        $attempts = 0;
-        $header   = '';
-        $response = null;
-        $jsessionid = '';
-
-        while ($attempts < 3 && '' === $header) {
-            $response = wp_remote_request($url, $handshake_args);
-
-            if (is_wp_error($response)) {
-                return $response;
-            }
-
-            $header = wp_remote_retrieve_header($response, 'www-authenticate');
-            if ('' === $jsessionid) {
-                $jsessionid = $this->extract_jsessionid_from_response($response);
-            }
-            $attempts++;
-        }
-
-        if ('' === $header) {
-            return new WP_Error(
-                'rrze_webt_missing_digest_header',
-                __('Unable to obtain the authentication challenge from the WEB-T service.', 'rrze-webt'),
-                [
-                    'response' => $response,
-                ]
-            );
-        }
-
-        return [
-            'header'   => $header,
-            'response' => $response,
-            'jsessionid' => $jsessionid,
-        ];
-    }
-
-    /**
-     * Extract JSESSIONID from Set-Cookie response header.
+     * Describe a v2 provider error without exposing a raw HTML page or document.
      *
-     * @param array $response WP HTTP response array.
-     * @return string
+     * @param mixed $data Decoded provider response.
+     * @return string A bounded, plain-text error description.
      */
-    private function extract_jsessionid_from_response($response): string
+    private function describe_api_error($data): string
     {
-        $set_cookie = wp_remote_retrieve_header($response, 'set-cookie');
-        if (! $set_cookie) {
-            return '';
-        }
-
-        $raw = is_array($set_cookie) ? implode('; ', $set_cookie) : (string) $set_cookie;
-
-        if (preg_match('/\bJSESSIONID=([^;]+)/', $raw, $m)) {
-            return (string) $m[1];
-        }
-
-        return '';
-    }
-
-    /**
-     * Builds the Digest authentication header value.
-     * 
-     * @param string $header   The 'WWW-Authenticate' header value from the server.
-     * @param string $url      The request URL.
-     * @param string $method   The HTTP method (e.g. "POST").
-     * @param string $username The username for authentication.
-     * @param string $password The password for authentication.
-     * @return string|WP_Error The constructed 'Authorization' header value, or WP_Error on failure.
-     */
-    private function build_digest_header(string $header, string $url, string $method, string $username, string $password)
-    {
-        $challenge = $this->parse_digest_challenge($header);
-
-        if (empty($challenge['nonce']) || empty($challenge['realm'])) {
-            return new WP_Error('rrze_webt_invalid_digest_header', __('The WEB-T service returned an invalid authentication challenge.', 'rrze-webt'), ['header' => $header]);
-        }
-
-        $realm = $challenge['realm'];
-
-        if (false === stripos($realm, 'Realm via Digest Authentication')) {
-            $realm .= ' Realm via Digest Authentication';
-        }
-
-        // RFC: use request-uri. Include query string if present.
-        $path  = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
-        $query = parse_url($url, PHP_URL_QUERY);
-        $uri   = $query ? ($path . '?' . $query) : $path;
-
-        $qop    = $this->normalize_qop($challenge['qop'] ?? '');
-        $nc     = '00000001';
-        $cnonce = $this->generate_cnonce();
-
-        $ha1 = md5($username . ':' . $realm . ':' . $password);
-        $ha2 = md5($method . ':' . $uri);
-
-        if ($qop) {
-            $response = md5($ha1 . ':' . $challenge['nonce'] . ':' . $nc . ':' . $cnonce . ':' . $qop . ':' . $ha2);
-        } else {
-            $response = md5($ha1 . ':' . $challenge['nonce'] . ':' . $ha2);
-        }
-
-        $quote = chr(34);
-
-        $values = [
-            'username'  => sprintf('%1$s%2$s%1$s', $quote, $username),
-            'realm'     => sprintf('%1$s%2$s%1$s', $quote, $realm),
-            'nonce'     => sprintf('%1$s%2$s%1$s', $quote, $challenge['nonce']),
-            'uri'       => sprintf('%1$s%2$s%1$s', $quote, $uri),
-            'algorithm' => sprintf('%1$sMD5%1$s', $quote),
-            'response'  => sprintf('%1$s%2$s%1$s', $quote, $response),
-        ];
-
-        if ($qop) {
-            $values['qop']    = $qop;
-            $values['nc']     = $nc;
-            $values['cnonce'] = sprintf('%1$s%2$s%1$s', $quote, $cnonce);
-        }
-
-        if (! empty($challenge['opaque'])) {
-            $values['opaque'] = sprintf('%1$s%2$s%1$s', $quote, $challenge['opaque']);
-        }
-
-        $digest = 'Digest ';
-        foreach ($values as $key => $value) {
-            $digest .= $key . '=' . $value . ', ';
-        }
-
-        return rtrim($digest, ', ');
-    }
-
-    /**
-     * Parses the Digest authentication challenge header into its components.
-     * 
-     * @param string $header The 'WWW-Authenticate' header value.
-     * @return array Associative array of challenge parameters.
-     */
-    private function parse_digest_challenge(string $header): array
-    {
-        $header = trim($header);
-
-        if (stripos($header, 'digest') === 0) {
-            $header = trim(substr($header, 6));
-        }
-
-        $matches = [];
-        preg_match_all('/([a-zA-Z0-9]+)=("([^"]+)"|([^,]+))/', $header, $matches, PREG_SET_ORDER);
-
-        $challenge = [];
-
-        foreach ($matches as $match) {
-            $key   = strtolower($match[1]);
-            $value = '' !== $match[3] ? $match[3] : trim($match[4]);
-            $challenge[$key] = $value;
-        }
-
-        return $challenge;
-    }
-
-    /**
-     * Normalizes the qop value from the challenge.
-     * 
-     * @param string $qop The qop value from the challenge.
-     * @return string The normalized qop value (e.g. "auth"), or empty string if none.
-     */
-    private function normalize_qop(string $qop): string
-    {
-        if ('' === $qop) {
-            return '';
-        }
-
-        $parts = array_map('trim', explode(',', $qop));
-        return $parts[0] ?? '';
-    }
-
-    /**
-     * Generates a client nonce (cnonce) for Digest authentication.
-     * 
-     * @return string The generated cnonce value.
-     */
-    private function generate_cnonce(): string
-    {
-        if (function_exists('wp_generate_uuid4')) {
-            return wp_generate_uuid4();
-        }
-
-        return md5(uniqid((string) mt_rand(), true));
-    }
-
-    /**
-     * Describes an API error based on the response body.
-     * 
-     * @param mixed $body The response body (string or array).
-     * @return string A human-readable error message.
-     */
-    private function describe_api_error($body): string
-    {
-        if (is_array($body)) {
-            $body = wp_json_encode($body);
-        }
-
-        $body = (string) $body;
-
-        if ('' === trim($body)) {
-            return __('Empty response from the WEB-T service.', 'rrze-webt');
-        }
-
-        $decoded = json_decode($body, true);
-
-        if (is_array($decoded)) {
-            if (isset($decoded['message']) && is_string($decoded['message'])) {
-                return $decoded['message'];
-            }
-
-            if (isset($decoded['errorMessage']) && is_string($decoded['errorMessage'])) {
-                return $decoded['errorMessage'];
-            }
-
-            if (isset($decoded['errorCode'])) {
-                $code    = (int) $decoded['errorCode'];
-                $message = $this->lookup_error_message($code);
-                if ($message) {
-                    return $message;
+        if (is_array($data)) {
+            foreach (['errorMessage', 'message'] as $key) {
+                if (isset($data[$key]) && is_string($data[$key]) && trim($data[$key]) !== '') {
+                    return sanitize_text_field(substr($data[$key], 0, 500));
                 }
             }
-        }
-
-        $trimmed = trim($body);
-
-        if (is_numeric($trimmed)) {
-            $code    = (int) $trimmed;
-            $message = $this->lookup_error_message($code);
-
-            if ($message) {
-                return $message;
+            if (isset($data['errorCode']) && is_int($data['errorCode'])) {
+                return sprintf(
+                    /* translators: %d: eTranslation error code. */
+                    __('The eTranslation service reported error %d.', 'rrze-webt'),
+                    $data['errorCode']
+                );
             }
         }
-
-        return $trimmed;
-    }
-
-    /**
-     * Looks up a human-readable error message for a given error code.
-     * 
-     * @param int $code The error code to look up.
-     * @return string|null The corresponding error message, or null if not found or deprecated.
-     */
-    private function lookup_error_message(int $code): ?string
-    {
-        $map     = self::get_error_map();
-        $message = $map[$code] ?? null;
-
-        if ('DEPRECATED' === $message) {
-            return null;
-        }
-
-        return $message;
-    }
-
-    /**
-     * Build cURL overrides in a defensive way.
-     * - Only sets options when the corresponding constant exists.
-     * - Avoids passing "0" for CURLOPT_SSLVERSION / relying on CURL_IPRESOLVE_WHATEVER.
-     *
-     * @param bool $force_ipv4 Force IPv4 if possible.
-     * @param bool $force_tls12 Force TLS 1.2 if possible.
-     * @return array<int, mixed>
-     */
-    private function build_curl_overrides(bool $force_ipv4, bool $force_tls12): array
-    {
-        $curl = [
-            // Avoid connection reuse issues with some proxies/gateways.
-            CURLOPT_FRESH_CONNECT => true,
-            CURLOPT_FORBID_REUSE  => true,
-            // Force HTTP/1.1 at curl level (more reliable than WP's httpversion).
-            CURLOPT_HTTP_VERSION  => CURL_HTTP_VERSION_1_1,
-        ];
-
-        if ($force_ipv4 && defined('CURL_IPRESOLVE_V4')) {
-            $curl[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
-        }
-
-        // Some middleboxes choke on TLS1.3; make it configurable.
-        if ($force_tls12 && defined('CURL_SSLVERSION_TLSv1_2')) {
-            $curl[CURLOPT_SSLVERSION] = CURL_SSLVERSION_TLSv1_2;
-        }
-
-        return $curl;
+        return __('The eTranslation service returned an empty or unrecognized error response.', 'rrze-webt');
     }
 }
