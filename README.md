@@ -10,6 +10,7 @@ Integrates eTranslation REST v2 into the WordPress block editor so authors can t
 - Local job reservation before dispatch, duplicate submission protection and traceable transport failures.
 - Manual source/target selections.
 - Stores translations in post meta to keep context across sessions.
+- Compares source and translation in a text preview and applies results only on confirmation in the editor.
 
 ## Requirements
 
@@ -61,8 +62,7 @@ disabled. Timeout, TLS verification and HTTP-version filters remain available.
 
 The callback URLs must be reachable from the EU service. Local development uses
 the explicit CLI simulator described below. A normal editor request still uses
-the configured service. Explicit application of results remains a separate repair
-step; callbacks currently still update posts automatically.
+the configured service. Callbacks only store job results; they never update the post.
 
 Protocol reference: [official REST v2 OpenAPI contract](https://language-tools.ec.europa.eu/assets/downloads/eTranslation-RestV2.yaml).
 
@@ -104,6 +104,36 @@ timeout (30 seconds versus 20 seconds by default). It refreshes the history afte
 success, errors and browser aborts. Aborting the browser request stops waiting;
 it cannot cancel an already submitted translation.
 
+### Reviewing and applying a translation
+
+Every new job stores the exact submitted title and content, including unsaved
+editor changes. Receiving a result or polling the history changes neither the
+stored post nor the open editor. **Review translation** opens a plain-text
+comparison; provider HTML is never executed in the preview.
+
+**Apply in editor** rechecks the current post ID, title and content against that
+snapshot. If they have changed, request a new translation. Confirmation replaces
+the title and Gutenberg block model in one normal, undoable editor change. The
+plugin does not call a save or publish endpoint. Normal WordPress saving,
+autosaving and revision behavior continue to apply. Cancelling changes nothing.
+
+New deliveries require exactly one ordered pair of title and content boundaries
+and a nonempty content segment. Block delimiter order, nesting and JSON settings
+must match the source. HTML element order and attributes such as links, image
+URLs, classes and IDs must also remain intact. Human-readable HTML attributes
+(`alt`, `title`, `aria-label`, `placeholder`) may translate. WordPress's KSES
+checks reject disallowed markup, and Gutenberg validates registered blocks in
+the browser before application. Damaged or unsupported content is rejected;
+the plugin does not silently convert it to a Classic/HTML block or repair it.
+
+This is deliberately conservative: custom/dynamic blocks whose translated text
+requires changes to their JSON settings are not supported by this whole-document
+workflow. Actual EU preservation of every custom block still requires live testing.
+Old jobs without a source snapshot remain viewable but cannot be applied; create
+a new job instead. The former `rrze_webt_auto_update_post` filter is no longer
+used. Job acknowledgement requires edit permission and records review only;
+it neither saves the post nor prevents a future explicit review.
+
 ## Usage
 
 1. Edit or create a post using the block editor.
@@ -111,7 +141,8 @@ it cannot cancel an already submitted translation.
 3. Choose the target language (defaults to the site language).
 4. Choose a source language.
 5. Click **Translate content**. A job is created and monitored until WEB-T responds.
-6. When complete, the post title and content update automatically. The translation history shows job details.
+6. When complete, click **Review translation** and compare the source and translated text.
+7. Click **Apply in editor** to replace the editor's title and content. Check the result and save/update the post through WordPress when ready; normal Undo remains available.
 
 ## Development
 

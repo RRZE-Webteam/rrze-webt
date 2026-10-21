@@ -83,7 +83,7 @@ die Prüfung selbst bleibt bestehen.
 Der Bericht gibt außerdem an, ob eigene Entwurfsseiten zurückgeblieben sind.
 PHP-Deprecation-Meldungen anderer installierter Plugins werden nicht unterdrückt.
 
-## Protokolle und Stand nach Schritt 3
+## Protokolle und Stand nach Schritt 4
 
 **V2** ist jetzt der Standard für alle neuen Aufträge und die Job-Tests. Geprüft
 werden die exakte `askTranslate`-Adresse, eine einzelne POST-Anfrage mit Basic
@@ -118,11 +118,17 @@ Der erste abgeschlossene oder fehlgeschlagene Zustand bleibt bestehen, auch bei
 späteren widersprüchlichen Rückmeldungen. Die Historie behält alle aktiven und
 die letzten drei nach Einreichung sortierten beendeten Aufträge.
 
-Stand der lokalen Prüfung am 21. Oktober 2026: **40 PASS, 2 KNOWN, 0 FAIL,
-0 XPASS**, keine zurückgebliebenen Testentwürfe. Offen bleiben
-`acknowledge_permission` (Berechtigung zur Bestätigung, Schritt 6) und
-`preserve_post` (bewusste Übernahme statt automatischem Überschreiben, Schritt 4).
-Die allgemeine REST-Sperre der Website erscheint weiterhin als `ENV BLOCKED`.
+Schritt 4 entfernt beide automatischen Schreibwege: Rückrufe speichern nur das
+Ergebnis am Auftrag, und Polling kündigt es lediglich an. Eine Vorschau und eine
+ausdrückliche Bestätigung sind für die Übernahme in den Editor erforderlich.
+`preserve_post` und `acknowledge_permission` sind damit ebenfalls behoben. Die
+Berechtigungsprüfung wurde aus Schritt 6 vorgezogen, weil die Job-Antwort nun
+auch den Ausgangstext enthält. `known-failures.php` ist leer; das bedeutet keine
+vollständige Live-Freigabe. Die allgemeine REST-Sperre bleibt `ENV BLOCKED`.
+
+Abnahmelauf am 21.10.2026: **49 PASS, 0 KNOWN, 0 FAIL, 0 XPASS**, keine eigenen
+Testentwürfe zurückgeblieben. Zusätzlich bestehen alle **16 Editor-Tests**;
+der Produktionsbuild und die PHP-Syntaxprüfungen sind erfolgreich.
 
 Quellen des simulierten Formats, geprüft am 20. Oktober 2026:
 
@@ -154,6 +160,12 @@ Dass diese Fixtures erhalten bleiben, belegt noch nicht, dass die echte EU-
 - Falsche Auftragsnummer oder Zielsprache im Callback.
 - Anonyme Zugriffe auf Übersetzen, Auftragsliste und Auftragsbestätigung.
 - Erhalt des gespeicherten Ausgangsinhalts bis zur bewussten Übernahme.
+- Exakter ungespeicherter Ausgangsstand trotz später geänderter Beitragsdaten.
+- Fehlende, doppelte oder vertauschte Dokumentgrenzen und leere Inhaltssegmente.
+- Beschädigte Blockkommentare, veränderte Blockeinstellungen und Linkziele.
+- Verschachtelte und dynamische Blockstrukturen sowie Backslashes in JSON-Attributen.
+- Übersetzbare HTML-Textattribute, unerlaubtes HTML und bewusst leere Titel.
+- Berechtigte Bestätigung ohne Beitragsschreibzugriff; der URL-Token bleibt maßgeblich.
 - Blockierung unerwarteter ausgehender HTTP-Anfragen.
 
 Eine Verzögerung wird durch eine explizit freigegebene Callback-Warteschlange
@@ -173,12 +185,35 @@ Mit Node.js ab Version 18, ohne zusätzliche Testabhängigkeiten:
 npm run test:editor
 ```
 
-Drei Prüfungen führen den tatsächlichen Quelltext aus `src/editor.js` mit einem
-kleinen simulierten WordPress-Host aus. Sie prüfen die Annahme eines vorhandenen
-Auftrags ohne Anbieter-ID, einen REST-Fehler und einen Browser-Abbruch. In allen
-Fällen wird die Historie erneut geladen; die Abbruchmeldung behauptet keine
-Stornierung beim Anbieter. Hooks werden nur einmal gerendert. Diese Prüfungen
-decken weder das React-Layout noch einen echten Browser-Netzwerkabbruch ab.
+16 Prüfungen führen den tatsächlichen Quelltext aus `src/editor.js` mit einem
+kleinen simulierten WordPress-Host aus. Sie prüfen Annahme ohne Anbieter-ID,
+REST-Fehler und Browser-Abbruch sowie Vorschau, Abbrechen, ausdrückliche Übernahme,
+Doppelklicks und Änderungen nach Öffnen der Vorschau. Auch ungültige/fehlende
+Blöcke, ältere Jobs ohne Ausgangsstand, leere Titel und ein Fehler beim Bestätigen
+sind abgedeckt. Kein Fall darf automatisch speichern oder veröffentlichen.
+
+Der Host simuliert Zustand und erneutes Rendern; die Blockparser-Rückgaben sind
+Test-Doubles. Diese Prüfungen ersetzen keine Prüfung mit den tatsächlichen
+Gutenberg-Blockregistrierungen, dem React-Layout oder echten Browser-Timeouts.
+
+## Manuelle Prüfung mit Gutenberg
+
+Am 21.10.2026 wurde die Vorschau zusätzlich im lokalen Firefox mit dem tatsächlich
+installierten Gutenberg geprüft. Dafür wurde ein eigener, markierter Entwurf mit
+einem bereits per CLI-Simulator abgeschlossenen Auftrag angelegt. Der Browser
+hat keinen Übersetzungsauftrag an die EU gesendet.
+
+- Das Eintreffen des Ergebnisses und das Abbrechen der deutschen Vergleichsvorschau
+  ließen Titel und Blöcke im Editor unverändert.
+- Eine nachträgliche Titeländerung zeigte den Konflikthinweis und sperrte die Übernahme.
+- Die ausdrückliche Übernahme aktualisierte Titel, Überschrift und Absatz; der Link
+  und die Hervorhebung blieben erhalten.
+- Ein einziger Gutenberg-Rückgängig-Schritt stellte Titel und Ausgangsblöcke wieder her.
+- Der eigene Testtab wurde geschlossen und der markierte Entwurf samt Revisionen entfernt.
+
+Die Standard-Fixtures verwenden feste Anbieter-Auftragsnummern. Ein separat
+angelegter Vorschauauftrag muss daher vor einem vollständigen CLI-Testlauf wieder
+entfernt sein, damit die Suche nach einer Auftragsnummer eindeutig bleibt.
 
 ## Umgebung, Isolation und Aufräumen
 

@@ -50,7 +50,7 @@ class WebTClient
      * @param int    $post_id Related WordPress post ID.
      * @param array  $callbacks Delivery URL in success, failure URL in error and optional notification URL.
      * @param string $client_token Client reference echoed by the service in callbacks.
-     * @param string $title Title to translate; empty uses the stored post title.
+     * @param string $title Title to translate; an empty title stays empty.
      * @return WP_Error An rrze_webt_async_job acknowledgement with request_id, or a failure.
      */
     public function translate(string $content, string $target_language, string $source_language = '', int $post_id = 0, array $callbacks = [], string $client_token = '', string $title = ''): WP_Error
@@ -82,7 +82,7 @@ class WebTClient
             return new WP_Error('rrze_webt_invalid_language', __('Please select valid source and target languages.', 'rrze-webt'));
         }
 
-        $document = $this->compose_translation_document('' !== $title ? $title : get_the_title($post_id), $content);
+        $document = $this->compose_translation_document($title, $content);
         $document_format = apply_filters('rrze_webt_document_format', 'html', $post_id);
         $filename = apply_filters('rrze_webt_document_filename', sprintf('post-%d', $post_id ?: time()), $post_id, $document_format);
         $payload = [
@@ -224,7 +224,7 @@ class WebTClient
      */
     private function compose_translation_document(string $title, string $content): string
     {
-        return self::TITLE_START . (string) $title . self::TITLE_END . self::CONTENT_START . (string) $content . self::CONTENT_END;
+        return self::TITLE_START . esc_html($title) . self::TITLE_END . self::CONTENT_START . (string) $content . self::CONTENT_END;
     }
 
     /**

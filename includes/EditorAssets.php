@@ -60,7 +60,7 @@ class EditorAssets
             return;
         }
 
-        $deps    = ['wp-plugins', 'wp-edit-post', 'wp-components', 'wp-element', 'wp-i18n', 'wp-data', 'wp-api-fetch', 'wp-notices'];
+        $deps    = ['wp-plugins', 'wp-edit-post', 'wp-components', 'wp-element', 'wp-i18n', 'wp-data', 'wp-api-fetch', 'wp-notices', 'wp-blocks'];
         $version = (string) (filemtime($script_path) ?: time());
 
         if (file_exists($asset_path)) {
@@ -111,6 +111,18 @@ class EditorAssets
             'jobMaxAgeMs'            => (int) apply_filters('rrze_webt_job_max_age_ms', 5 * 60 * 1000), // 5min            
 
             'i18n' => [
+                'reviewTranslation' => __('Review translation', 'rrze-webt'),
+                'reviewInstructions' => __('Compare the text before replacing the editor title and content. Formatting is checked separately. Saving remains a separate WordPress action.', 'rrze-webt'),
+                'reviewOriginal' => __('Submitted original', 'rrze-webt'),
+                'reviewResult' => __('Translation', 'rrze-webt'),
+                'reviewNoTitle' => __('(No title)', 'rrze-webt'),
+                'reviewCancel' => __('Cancel', 'rrze-webt'),
+                'reviewApply' => __('Apply in editor', 'rrze-webt'),
+                'reviewApplied' => __('Translation applied in the editor. Review and save the post when ready.', 'rrze-webt'),
+                'reviewLegacy' => __('This older job has no source snapshot. Request a new translation before applying it.', 'rrze-webt'),
+                'reviewChanged' => __('The title or content has changed since this translation was requested. Request a new translation to keep your changes.', 'rrze-webt'),
+                'reviewInvalid' => __('The translation contains invalid or unsupported blocks. It cannot be applied safely.', 'rrze-webt'),
+                'reviewAckError' => __('The translation is in the editor, but its review could not be recorded. Save the post normally.', 'rrze-webt'),
                 'panelTitle'           => __('WEB-T Translation', 'rrze-webt'),
                 'translateButton'      => __('Translate content', 'rrze-webt'),
                 'languageLabel'        => __('Target language', 'rrze-webt'),
@@ -120,16 +132,16 @@ class EditorAssets
                 'inProgress'           => __('Translating…', 'rrze-webt'),
                 'successNotice'        => __('Content translated with WEB-T.', 'rrze-webt'),
                 'errorNotice'          => __('Translation failed. Check the console for details.', 'rrze-webt'),
-                'jobSubmitted'         => __('Translation request submitted. The translated content will appear automatically once ready.', 'rrze-webt'),
+                'jobSubmitted'         => __('Translation request submitted. Review the result before applying it in the editor.', 'rrze-webt'),
                 'jobFailed'            => __('The translation service reported a failure.', 'rrze-webt'),
-                'jobReceived'          => __('Translation received from WEB-T.', 'rrze-webt'),
+                'jobReceived'          => __('Translation received. Review it before applying it in the editor.', 'rrze-webt'),
                 'jobListTitle'         => __('Translation jobs', 'rrze-webt'),
                 'jobStatusPending'     => __('Pending', 'rrze-webt'),
                 'jobStatusFailed'      => __('Failed', 'rrze-webt'),
                 'jobStatusCompleted'   => __('Completed', 'rrze-webt'),
                 'jobMessageNone'       => __('No details available.', 'rrze-webt'),
                 'jobPendingMessage'    => __('Waiting for WEB-T to process this translation request.', 'rrze-webt'),
-                'jobCompletedMessage'  => __('Translation received from WEB-T.', 'rrze-webt'),
+                'jobCompletedMessage'  => __('Translation received. Review it before applying it in the editor.', 'rrze-webt'),
                 'jobRequestLabel'      => __('WEB-T request ID:', 'rrze-webt'),
                 'jobTokenLabel'        => __('Client token:', 'rrze-webt'),
                 'jobSubmittedLabel'    => __('Submitted:', 'rrze-webt'),

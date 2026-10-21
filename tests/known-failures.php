@@ -8,7 +8,4 @@
  *
  * @package RRZE\WebT\Tests
  */
-return [
-    'acknowledge_permission' => 'Step 6: acknowledging a job does not require edit permission.',
-    'preserve_post' => 'Step 4: successful callbacks overwrite the stored post automatically.',
-];
+return [];

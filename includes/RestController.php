@@ -27,33 +27,6 @@ class RestController extends WP_REST_Controller
     private $job_store;
 
     /**
-     * Markers used to delineate title in the translation document.
-     * 
-     * @var string
-     */
-    private const TITLE_START  = '<!--RRZE_WEBT_TITLE_START-->';
-
-    /**
-     * Markers used to delineate title in the translation document.
-     * @var string
-     */
-    private const TITLE_END    = '<!--RRZE_WEBT_TITLE_END-->';
-
-    /**
-     * Markers used to delineate content in the translation document.
-     * 
-     * @var string
-     */
-    private const CONTENT_START = '<!--RRZE_WEBT_CONTENT_START-->';
-
-    /**
-     * Markers used to delineate content in the translation document.
-     * 
-     * @var string
-     */
-    private const CONTENT_END   = '<!--RRZE_WEBT_CONTENT_END-->';
-
-    /**
      * Constructor.
      * 
      * @param WebTClient $client The WebT client instance.
@@ -110,7 +83,7 @@ class RestController extends WP_REST_Controller
             [
                 [
                     'methods'             => WP_REST_Server::CREATABLE,
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => [$this, 'check_ack_permissions'],
                     'callback'            => [$this, 'handle_ack_job'],
                 ],
             ]
@@ -161,7 +134,7 @@ class RestController extends WP_REST_Controller
         if ($post_id <= 0 || ! $post || $post->post_status === 'trash' || wp_is_post_revision($post_id)) {
             return new WP_Error('rrze_webt_invalid_post', __('Save the post before requesting a translation.', 'rrze-webt'), ['status' => 400]);
         }
-        if ($title === '') {
+        if (! $request->has_param('title')) {
             $title = get_the_title($post_id);
         }
         if (trim($content) === '') {
@@ -183,6 +156,7 @@ class RestController extends WP_REST_Controller
             'token' => $client_token, 'post_id' => $post_id, 'api_version' => 2,
             'source_language' => $source_language, 'target_language' => $target_language,
             'fingerprint' => $fingerprint,
+            'source_content' => $content, 'source_title' => $title,
             'expires_at' => time() + max(1, (int) apply_filters('rrze_webt_job_max_age_seconds', 5 * 60)),
             'message' => __('Submitting translation request to WEB-T.', 'rrze-webt'),
         ]);
@@ -297,10 +271,9 @@ class RestController extends WP_REST_Controller
                 'minimum'     => 1,
             ],
             'title' => [
-                'description' => __('The post title to translate.', 'rrze-webt'),
+                'description' => __('The post title to translate; an explicitly empty title stays empty.', 'rrze-webt'),
                 'type'        => 'string',
                 'required'    => false,
-                'default'     => '',
             ],
         ];
     }
@@ -337,7 +310,7 @@ class RestController extends WP_REST_Controller
      */
     public function handle_ack_job(WP_REST_Request $request)
     {
-        $token = (string) $request->get_param('token');
+        $token = (string) ($request->get_url_params()['token'] ?? '');
         $job   = $this->job_store->get_job_by_token($token);
 
         if (! $job) {
@@ -405,7 +378,7 @@ class RestController extends WP_REST_Controller
                 }
                 $segments = null;
                 if ($status === 'success') {
-                    $segments = $this->extract_translation_content($request);
+                    $segments = $this->extract_translation_content($request, $current);
                     if (is_wp_error($segments)) {
                         $failed = $this->job_store->fail_job($token, $segments->get_error_message(), $segments->get_error_code());
                         return is_wp_error($failed) ? $failed : new WP_REST_Response(['status' => 'invalid_content'], 400);
@@ -432,9 +405,6 @@ class RestController extends WP_REST_Controller
                 $completed = $this->job_store->complete_job($token, $segments);
                 if (is_wp_error($completed)) {
                     return $completed;
-                }
-                if ($completed) {
-                    $this->maybe_update_post($completed, $segments);
                 }
                 return new WP_REST_Response(['status' => 'stored'], 200);
             }
@@ -486,9 +456,9 @@ class RestController extends WP_REST_Controller
      * @param WP_REST_Request $request The current request.
      * @return bool True if the user has permission, false otherwise.
      */
-    private function check_ack_permissions(WP_REST_Request $request): bool
+    public function check_ack_permissions(WP_REST_Request $request): bool
     {
-        $token = (string) $request->get_param('token');
+        $token = (string) ($request->get_url_params()['token'] ?? '');
         $job   = $this->job_store->get_job_by_token($token);
 
         if (! $job) {
@@ -520,10 +490,15 @@ class RestController extends WP_REST_Controller
             'message'        => $job['message'],
             'acknowledged'   => (bool) ($job['acknowledged'] ?? false),
             'acknowledgedAt' => $job['acknowledged_at'] ?? 0,
+            'postId' => (int) $job['post_id'],
+            'sourceTitle' => $job['source_title'] ?? null,
+            'sourceContent' => $job['source_content'] ?? null,
+            'sourcePreview' => TranslationDocument::preview($job['source_content'] ?? ''),
         ];
 
         if ('completed' === $job['status']) {
             $sanitized['content'] = $job['content'];
+            $sanitized['preview'] = TranslationDocument::preview($job['content']);
         } else {
             $sanitized['content'] = null;
         }
@@ -564,9 +539,10 @@ class RestController extends WP_REST_Controller
      * Extract translated content from the request body.
      * 
      * @param WP_REST_Request $request The current request.
-     * @return array|WP_Error The extracted segments or an error.
+     * @param array $job Stored job including the optional submitted source snapshot.
+     * @return array|WP_Error Validated segments or an error.
      */
-    private function extract_translation_content(WP_REST_Request $request)
+    private function extract_translation_content(WP_REST_Request $request, array $job)
     {
         $body         = $request->get_body();
         if ($request->is_json_content_type()) {
@@ -587,91 +563,18 @@ class RestController extends WP_REST_Controller
             return new WP_Error('rrze_webt_invalid_base64', __('WEB-T callback content is not a valid Base64-encoded UTF-8 document.', 'rrze-webt'));
         }
 
-        // Raw Base64 remains accepted for v1 jobs submitted before the upgrade.
-        return $this->split_translated_document($decoded);
-    }
-
-    /**
-     * Update the post with the translated content if configured to do so.
-     * 
-     * @param array $job The job metadata stored in the job store.
-     * @param array $segments The translated segments (title, content).
-     * @return void
-     */
-    private function maybe_update_post(array $job, array $segments): void
-    {
-        $post_id = (int) $job['post_id'];
-
-        if ($post_id <= 0) {
-            return;
+        // Old jobs remain viewable, but only snapshot-backed jobs can be applied.
+        $has_source = isset($job['source_content'], $job['source_title']);
+        $segments = TranslationDocument::split($decoded, $has_source);
+        if (is_wp_error($segments)) {
+            return $segments;
         }
-
-        /**
-         * Decide whether the translated content should be applied to the post automatically.
-         *
-         * @param bool  $should_update Default behaviour (true).
-         * @param int   $post_id       The post ID.
-         * @param array $job           Job metadata stored in the job store.
-         */
-        $should_update = apply_filters('rrze_webt_auto_update_post', true, $post_id, $job);
-
-        if (! $should_update) {
-            return;
+        if ($has_source) {
+            $validation = TranslationDocument::validate($job['source_content'], $segments['content']);
+            if (is_wp_error($validation)) {
+                return $validation;
+            }
         }
-
-        $post_arr = ['ID' => $post_id];
-
-        if (! empty($segments['content'])) {
-            $post_arr['post_content'] = $segments['content'];
-        }
-
-        if (! empty($segments['title'])) {
-            $post_arr['post_title'] = $segments['title'];
-        }
-
-        wp_update_post($post_arr);
-    }
-
-    /**
-     * Split the translated document into title and content segments.
-     * 
-     * @param string $document The full translated document.
-     * @return array An array with 'title' and 'content' keys.
-     */
-    private function split_translated_document(string $document): array
-    {
-        $title   = $this->extract_segment($document, self::TITLE_START, self::TITLE_END);
-        $content = $this->extract_segment($document, self::CONTENT_START, self::CONTENT_END);
-
-        if ('' === $content && '' === $title) {
-            $content = $document;
-        }
-
-        return [
-            'title'   => $title,
-            'content' => $content,
-        ];
-    }
-
-    /**
-     * Extract a segment from the document between the specified start and end markers.
-     * 
-     * @param string $document The full document.
-     * @param string $start The start marker.
-     * @param string $end The end marker.
-     * @return string The extracted segment or an empty string if not found.
-     */
-    private function extract_segment(string $document, string $start, string $end): string
-    {
-        $start_pos = strpos($document, $start);
-        $end_pos   = strpos($document, $end);
-
-        if (false === $start_pos || false === $end_pos || $end_pos <= $start_pos) {
-            return '';
-        }
-
-        $segment = substr($document, $start_pos + strlen($start), $end_pos - ($start_pos + strlen($start)));
-
-        return trim($segment);
+        return $segments;
     }
 }

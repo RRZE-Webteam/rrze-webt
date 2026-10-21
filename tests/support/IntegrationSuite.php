@@ -196,6 +196,13 @@ final class IntegrationSuite
             'unknown_payload' => 'Valid but unrelated JSON is rejected as translation content.',
             'callback_correlation' => 'Mismatching request ID or language cannot complete a job.',
             'acknowledge_permission' => 'Anonymous users cannot acknowledge a job.',
+            'source_snapshot' => 'Unsaved source snapshots survive concurrent stored-post edits.',
+            'document_boundaries' => 'Missing or ambiguous document boundaries fail safely.',
+            'structure_guard' => 'Changed Gutenberg structure or HTML attributes are rejected.',
+            'nested_block_contract' => 'Nested/custom block settings and escaped source content remain intact.',
+            'text_attribute_contract' => 'Text attributes may translate while unsafe HTML is rejected.',
+            'empty_title' => 'An explicitly empty title remains empty and title entities are decoded.',
+            'acknowledge_review' => 'Only an editor can acknowledge a result, without saving the post.',
             'preserve_post' => 'Receiving a translation does not overwrite the stored source.',
         ];
     }
@@ -1213,6 +1220,154 @@ final class IntegrationSuite
         $response = $this->request('POST', 'jobs/ack/' . $receipt['externalReference']);
         return in_array($response->get_status(), [401, 403], true)
             && ! $this->job($receipt)['acknowledged'];
+    }
+
+    /**
+     * Preserve the exact unsaved input, even if the stored post changes during translation.
+     * @return bool Whether receipt and polling leave newer post edits intact.
+     */
+    private function source_snapshot(): bool
+    {
+        $receipt = $this->accepted();
+        $source = $this->simulator->fixture('source.html');
+        wp_update_post(['ID' => $this->post_id, 'post_title' => 'Newer title', 'post_content' => '<p>Newer content</p>']);
+        $updates = $this->post_updates;
+        $this->require_true($this->simulator->deliver($receipt)->get_status() === 200, 'Delivery failed.');
+        $job = $this->request('GET', 'jobs/' . $this->post_id)->get_data()['jobs'][0];
+        (new JobStore())->update_job_status($receipt['externalReference'], ['source_content' => 'tampered', 'source_title' => 'tampered']);
+        return $job['sourceContent'] === $source && $job['sourceTitle'] === 'Lokaler Test'
+            && $job['postId'] === $this->post_id && ! $job['acknowledged']
+            && $this->job($receipt)['source_content'] === $source
+            && get_post_field('post_title', $this->post_id) === 'Newer title'
+            && get_post_field('post_content', $this->post_id) === '<p>Newer content</p>'
+            && $this->post_updates === $updates;
+    }
+
+    /**
+     * Wrap a deterministic document as the provider would, for boundary tests.
+     * @param string $content Translated block HTML.
+     * @param string $title Translated title segment.
+     * @return string Document containing the sender's exact boundaries.
+     */
+    private function translated_document(string $content, string $title = 'Local test'): string
+    {
+        return '<!--RRZE_WEBT_TITLE_START-->' . $title . '<!--RRZE_WEBT_TITLE_END--><!--RRZE_WEBT_CONTENT_START-->' . $content . '<!--RRZE_WEBT_CONTENT_END-->';
+    }
+
+    /**
+     * Reject missing, duplicate, reordered or empty content boundaries through real callbacks.
+     * @return bool Whether every malformed result fails without writing the source.
+     */
+    private function document_boundaries(): bool
+    {
+        $valid = $this->translated_document($this->simulator->fixture('translation.html'));
+        $variants = [
+            $this->simulator->fixture('translation.html'),
+            str_replace('<!--RRZE_WEBT_TITLE_END-->', '', $valid),
+            str_replace('<!--RRZE_WEBT_CONTENT_END-->', '', $valid),
+            $valid . '<!--RRZE_WEBT_TITLE_START-->',
+            '<!--RRZE_WEBT_TITLE_END-->' . str_replace('<!--RRZE_WEBT_TITLE_END-->', '', $valid),
+            $this->translated_document(''),
+        ];
+        foreach ($variants as $document) {
+            $response = $this->submit();
+            $receipt = end($this->simulator->queue);
+            $this->require_true($response->get_status() === 202, 'Boundary fixture was not accepted.');
+            if ($this->simulator->deliver($receipt, 'success', ['result' => base64_encode($document)])->get_status() !== 400
+                || $this->job($receipt)['error_code'] !== 'rrze_webt_invalid_document') {
+                return false;
+            }
+        }
+        return $this->post_updates === 0;
+    }
+
+    /**
+     * Refuse damaged Gutenberg comments, changed metadata and changed link targets.
+     * @return bool Whether unsafe structural changes fail before the result is usable.
+     */
+    private function structure_guard(): bool
+    {
+        $html = $this->simulator->fixture('translation.html');
+        $variants = [
+            preg_replace('/<!--.*?-->/s', '', $html),
+            str_replace('<!-- /wp:paragraph -->', '', $html),
+            str_replace('wp:heading', 'wp:paragraph', $html),
+            str_replace('<!-- wp:paragraph -->', '<!-- wp:paragraph {"className":"changed"} -->', $html),
+            str_replace('<!-- wp:paragraph -->', '<!-- wp:paragraph {broken} -->', $html),
+            str_replace('https://example.org/study', 'https://example.org/changed', $html),
+            str_replace('<p>', '<p onclick="alert(1)">', $html),
+        ];
+        foreach ($variants as $content) {
+            $this->require_true($this->submit()->get_status() === 202, 'Structure fixture was not accepted.');
+            $receipt = end($this->simulator->queue);
+            if ($this->simulator->deliver($receipt, 'success', ['result' => base64_encode($this->translated_document($content))])->get_status() !== 400
+                || $this->job($receipt)['status'] !== 'failed') {
+                return false;
+            }
+        }
+        return $this->post_updates === 0;
+    }
+
+    /**
+     * Exercise nested/custom block structure and slashed JSON without reserializing it.
+     * @return bool Whether text translations preserve nested blocks and dynamic settings.
+     */
+    private function nested_block_contract(): bool
+    {
+        $source = '<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Deutsch</p><!-- /wp:paragraph --><!-- wp:rrze/example {"path":"C:\\\\docs","id":7} /--></div><!-- /wp:group -->';
+        $translated = str_replace('Deutsch', 'English', $source);
+        $valid = \RRZE\WebT\TranslationDocument::validate($source, $translated);
+        $this->require_true($valid === null, is_wp_error($valid) ? $valid->get_error_code() . ': ' . wp_kses_post($translated) : 'Nested source was rejected.');
+        $invalid = \RRZE\WebT\TranslationDocument::validate($source, str_replace('"id":7', '"id":8', $translated));
+        $job = (new JobStore())->create_job(['token' => wp_generate_uuid4(), 'post_id' => $this->post_id, 'source_content' => $source]);
+        return $valid === null && is_wp_error($invalid) && is_array($job)
+            && (new JobStore())->get_job_by_token($job['token'])['source_content'] === $source;
+    }
+
+    /**
+     * Allow translated accessibility text while retaining URLs and rejecting executable HTML.
+     * @return bool Whether attribute translation and KSES checks behave independently.
+     */
+    private function text_attribute_contract(): bool
+    {
+        $source = '<p><img src="https://example.org/a.jpg" alt="Deutsch" title="Bild"></p>';
+        $result = str_replace(['Deutsch', 'Bild'], ['English', 'Image'], $source);
+        $unsafe = '<script>alert(1)</script><p>Test</p>';
+        return \RRZE\WebT\TranslationDocument::validate($source, $result) === null
+            && is_wp_error(\RRZE\WebT\TranslationDocument::validate($unsafe, $unsafe))
+            && ! str_contains(\RRZE\WebT\TranslationDocument::preview($unsafe), 'alert');
+    }
+
+    /**
+     * Keep an explicitly empty title and decode escaped title text without introducing markup.
+     * @return bool Whether sender, snapshot and receiver preserve title semantics.
+     */
+    private function empty_title(): bool
+    {
+        $response = $this->request('POST', 'translate', [
+            'post_id' => $this->post_id, 'title' => '', 'content' => $this->simulator->fixture('source.html'),
+            'source_language' => 'DE', 'target_language' => 'EN',
+        ]);
+        $this->require_true($response->get_status() === 202, 'Empty title request failed.');
+        $receipt = end($this->simulator->queue);
+        $document = $this->translated_document($this->simulator->fixture('translation.html'), '');
+        $this->require_true($this->simulator->deliver($receipt, 'success', ['result' => base64_encode($document)])->get_status() === 200, 'Empty translated title was rejected.');
+        $encoded = \RRZE\WebT\TranslationDocument::split($this->translated_document('<p>Test</p>', 'A &amp; B &lt; C'), true);
+        return $this->job($receipt)['title'] === '' && $this->job($receipt)['source_title'] === ''
+            && $encoded['title'] === 'A & B < C' && $this->post_updates === 0;
+    }
+
+    /**
+     * Acknowledge as an editor without treating acknowledgement as permission to save a post.
+     * @return bool Whether acknowledgement only updates job metadata and uses the URL token.
+     */
+    private function acknowledge_review(): bool
+    {
+        $receipt = $this->accepted();
+        $this->require_true($this->simulator->deliver($receipt)->get_status() === 200, 'Review delivery failed.');
+        $response = $this->request('POST', 'jobs/ack/' . $receipt['externalReference'], ['token' => 'wrong-token']);
+        return $response->get_status() === 200 && $this->job($receipt)['acknowledged']
+            && $this->post_updates === 0 && $response->get_data()['job']['sourceTitle'] === 'Lokaler Test';
     }
 
     /**

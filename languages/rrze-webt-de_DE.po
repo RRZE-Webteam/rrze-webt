@@ -601,3 +601,54 @@ msgstr "Details ausblenden"
 #: src/editor.js:525
 msgid "Show details"
 msgstr "Details anzeigen"
+
+msgid "Translation request submitted. Review the result before applying it in the editor."
+msgstr "Übersetzungsauftrag übermittelt. Prüfe das Ergebnis, bevor du es im Editor übernimmst."
+
+msgid "Translation received. Review it before applying it in the editor."
+msgstr "Übersetzung eingegangen. Prüfe sie vor der Übernahme im Editor."
+
+msgid "The translation changed block structure, block settings or HTML attributes. It cannot be applied safely. The original content is unchanged."
+msgstr "Die Übersetzung hat die Blockstruktur, Blockeinstellungen oder HTML-Attribute verändert. Sie kann nicht sicher übernommen werden. Der Ausgangsinhalt bleibt unverändert."
+
+msgid "The translation contains HTML that is not allowed in posts. The original content is unchanged."
+msgstr "Die Übersetzung enthält HTML, das in Beiträgen nicht erlaubt ist. Der Ausgangsinhalt bleibt unverändert."
+
+msgid "The translation is missing intact title/content boundaries or contains no content. The original content is unchanged."
+msgstr "In der Übersetzung fehlen eindeutige Grenzen für Titel und Inhalt, oder der Inhalt ist leer. Der Ausgangsinhalt bleibt unverändert."
+
+msgid "Review translation"
+msgstr "Übersetzung prüfen"
+
+msgid "Compare the text before replacing the editor title and content. Formatting is checked separately. Saving remains a separate WordPress action."
+msgstr "Vergleiche die Texte, bevor du Titel und Inhalt im Editor ersetzt. Die Formatierung wird gesondert geprüft. Gespeichert wird über WordPress."
+
+msgid "Submitted original"
+msgstr "Übermittelter Ausgangstext"
+
+msgid "Translation"
+msgstr "Übersetzung"
+
+msgid "(No title)"
+msgstr "(Ohne Titel)"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Apply in editor"
+msgstr "Im Editor übernehmen"
+
+msgid "Translation applied in the editor. Review and save the post when ready."
+msgstr "Übersetzung im Editor übernommen. Prüfe den Beitrag und speichere ihn anschließend."
+
+msgid "This older job has no source snapshot. Request a new translation before applying it."
+msgstr "Für diesen älteren Auftrag fehlt der Ausgangsstand. Starte vor der Übernahme eine neue Übersetzung."
+
+msgid "The title or content has changed since this translation was requested. Request a new translation to keep your changes."
+msgstr "Titel oder Inhalt wurden seit dem Übersetzungsauftrag geändert. Starte eine neue Übersetzung, damit deine Änderungen erhalten bleiben."
+
+msgid "The translation contains invalid or unsupported blocks. It cannot be applied safely."
+msgstr "Die Übersetzung enthält ungültige oder nicht unterstützte Blöcke. Sie kann nicht sicher übernommen werden."
+
+msgid "The translation is in the editor, but its review could not be recorded. Save the post normally."
+msgstr "Die Übersetzung ist im Editor, aber die Bestätigung konnte nicht gespeichert werden. Speichere den Beitrag wie gewohnt."

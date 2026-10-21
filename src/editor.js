@@ -3,7 +3,7 @@
 
     const { PluginSidebar, PluginSidebarMoreMenuItem } = wp.editPost;
 
-    const { PanelBody, SelectControl, Button, Notice, Spinner, Dashicon } =
+    const { PanelBody, SelectControl, Button, Notice, Spinner, Dashicon, Modal } =
         wp.components;
 
     const { Fragment, useMemo, useState, useEffect, useRef } = wp.element;
@@ -143,7 +143,7 @@
     const jobSubmittedMsg = getString(
         "jobSubmitted",
         __(
-            "Translation request submitted. The translated content will appear automatically once ready.",
+            "Translation request submitted. Review the result before applying it in the editor.",
             "rrze-webt"
         )
     );
@@ -223,6 +223,26 @@
         __("There are no translation jobs yet.", "rrze-webt")
     );
 
+    /**
+     * Verify every parsed block and its nested type/order against the source.
+     * @param {Array} source Parsed source blocks.
+     * @param {Array} translated Parsed result blocks.
+     * @returns {boolean} Whether Gutenberg can safely edit the matching block tree.
+     */
+    const validBlockTree = (source, translated) => {
+        if (source.length !== translated.length) return false;
+        return translated.every(
+            /** @param {Object} block Result block. @param {number} index Source position. @returns {boolean} */
+            (block, index) => {
+                const original = source[index];
+                return original.name === block.name && block.name !== "core/missing" &&
+                    !!wp.blocks.getBlockType(block.name) && original.isValid !== false && block.isValid !== false &&
+                    validBlockTree(original.innerBlocks || [], block.innerBlocks || []);
+            }
+        );
+    };
+
+    /** @returns {Object} Translation controls, job history and explicit review dialog. */
     const TranslationContent = () => {
         const lastTarget = useMemo(() => {
             const lt = loadLastTarget();
@@ -247,6 +267,9 @@
         const [jobs, setJobs] = useState([]);
         const [isLoadingJobs, setIsLoadingJobs] = useState(false);
         const [expandedTokens, setExpandedTokens] = useState([]);
+        const [reviewJob, setReviewJob] = useState(null);
+        const [reviewError, setReviewError] = useState("");
+        const appliedTokensRef = useRef(new Set());
         const processedTokensRef = useRef(new Set());
         const jobsFetcherRef = useRef(null);
         const jobsRef = useRef([]);
@@ -272,10 +295,26 @@
             options.length === 0 ||
             isTranslating ||
             hasPendingJob;
-        const postId = dataSelect("core/editor").getCurrentPostId();
+        // Subscribe so edits made while the dialog is open immediately invalidate it.
+        const { postId } = wp.data.useSelect(
+            /** @param {Function} select Store selector. @returns {Object} Current unsaved post. */
+            (select) => {
+                const editor = select("core/editor");
+                return {
+                    postId: editor.getCurrentPostId(),
+                    editorContent: editor.getEditedPostContent(),
+                    editorTitle: editor.getEditedPostAttribute("title") || "",
+                };
+            }, []
+        );
         const jobsPath =
             postId && jobsPathBase ? `${jobsPathBase}/${postId}` : "";
 
+        /**
+         * Remember that an editor reviewed a result; this does not save the post.
+         * @param {string} token Local job token.
+         * @returns {void}
+         */
         const ackJob = (token) => {
             if (!jobsAckPathBase || !token) {
                 return;
@@ -284,13 +323,17 @@
             apiFetch({
                 path: `${jobsAckPathBase}/${token}`,
                 method: "POST",
-            }).catch((error) => {
-                // eslint-disable-next-line no-console
-                console.error("WEB-T acknowledge job failed", error);
-            });
+            }).catch(
+                /** @param {Error} error Failed acknowledgement; the editor change is retained. */
+                (error) => {
+                    notices.createErrorNotice(getString("reviewAckError", __("The translation is in the editor, but its review could not be recorded. Save the post normally.", "rrze-webt")), { id: "rrze-webt-ack-error" });
+                }
+            );
         };
 
-        useEffect(() => {
+        useEffect(
+            /** @returns {Function} Stop polling when leaving this post. */
+            () => {
             if (!jobsPath) {
                 setJobs([]);
                 return () => {};
@@ -298,6 +341,7 @@
 
             let isMounted = true;
 
+            /** @param {Array} items Stored jobs; polling never changes editor content. @returns {void} */
             const handleJobs = (items) => {
                 if (!Array.isArray(items)) {
                     return;
@@ -308,7 +352,9 @@
 
                 // Keep the current source selection unless user changes it manually.
 
-                items.forEach((job) => {
+                items.forEach(
+                    /** @param {Object} job Job to announce once in this editor session. @returns {void} */
+                    (job) => {
                     if (!job || !job.token) {
                         return;
                     }
@@ -324,25 +370,10 @@
                         (job.content || job.title) &&
                         !job.acknowledged
                     ) {
-                        const update = {};
-
-                        if (job.content) {
-                            update.content = job.content;
-                        }
-
-                        if (job.title) {
-                            update.title = job.title;
-                        }
-
-                        if (Object.keys(update).length) {
-                            dataDispatch("core/editor").editPost(update);
-                        }
-
                         processedTokensRef.current.add(token);
-                        notices.createSuccessNotice(jobReceivedMsg, {
+                        notices.createInfoNotice(jobReceivedMsg, {
                             id: `rrze-webt-job-success-${token}`,
                         });
-                        ackJob(token);
                         return;
                     }
 
@@ -353,11 +384,11 @@
                             id: `rrze-webt-job-failed-${token}`,
                             isDismissible: true,
                         });
-                        ackJob(token);
                     }
                 });
             };
 
+            /** @returns {Promise<void>} Refresh history without applying or acknowledging jobs. */
             const fetchJobs = () => {
                 if (!jobsRef.current.length) {
                     setIsLoadingJobs(true);
@@ -466,6 +497,7 @@
             }));
         }, [availableLanguages]);
 
+        /** @returns {Object|Array} Job history with an explicit review action. */
         const renderJobs = () => {
             if (isLoadingJobs && !jobs.length) {
                 return wp.element.createElement(
@@ -494,7 +526,9 @@
                 );
             }
 
-            return jobs.map((job) => {
+            return jobs.map(
+                /** @param {Object} job Stored job. @returns {Object} Job card. */
+                (job) => {
                 const token = job.token || Math.random().toString(36).slice(2);
                 const status = job.status || "pending";
                 const noticeStatus =
@@ -580,6 +614,17 @@
                             )
                         )
                     ),
+                    status === "completed" && wp.element.createElement(
+                        Button,
+                        {
+                            variant: "secondary",
+                            className: "rrze-webt-review-button",
+                            onClick:
+                                /** @returns {void} Open an inert preview without editing the post. */
+                                () => { setReviewError(""); setReviewJob(job); },
+                        },
+                        getString("reviewTranslation", __("Review translation", "rrze-webt"))
+                    ),
                     expanded &&
                         wp.element.createElement(
                             Fragment,
@@ -645,6 +690,87 @@
         };
 
         /**
+         * Recheck the live editor and the registered Gutenberg blocks before application.
+         * @param {Object} job Result selected by the user.
+         * @returns {{error: string, blocks?: Array}} A blocking reason or validated blocks.
+         */
+        const validateReview = (job) => {
+            const editor = dataSelect("core/editor");
+            if (!job || job.status !== "completed" || typeof job.sourceContent !== "string" || typeof job.sourceTitle !== "string") {
+                return { error: getString("reviewLegacy", __("This older job has no source snapshot. Request a new translation before applying it.", "rrze-webt")) };
+            }
+            if (Number(job.postId) !== Number(editor.getCurrentPostId()) ||
+                job.sourceContent !== editor.getEditedPostContent() ||
+                job.sourceTitle !== (editor.getEditedPostAttribute("title") || "")) {
+                return { error: getString("reviewChanged", __("The title or content has changed since this translation was requested. Request a new translation to keep your changes.", "rrze-webt")) };
+            }
+            try {
+                const before = wp.blocks.parse(job.sourceContent);
+                const after = wp.blocks.parse(job.content);
+                if (!after.length || !validBlockTree(before, after)) throw new Error("Invalid block tree");
+                return { error: "", blocks: after };
+            } catch {
+                return { error: getString("reviewInvalid", __("The translation contains invalid or unsupported blocks. It cannot be applied safely.", "rrze-webt")) };
+            }
+        };
+
+        /** @returns {void} Close the dialog without changing the post. */
+        const closeReview = () => { setReviewJob(null); setReviewError(""); };
+
+        /**
+         * Apply one reviewed result as an undoable, unsaved Gutenberg edit.
+         * @returns {void}
+         */
+        const applyReviewedTranslation = () => {
+            if (!reviewJob || appliedTokensRef.current.has(reviewJob.token)) return;
+            const validation = validateReview(reviewJob);
+            if (validation.error) { setReviewError(validation.error); return; }
+            // One edit updates both the block model and title, preserving normal undo.
+            dataDispatch("core/editor").editPost({
+                title: reviewJob.title,
+                content: reviewJob.content,
+                blocks: validation.blocks,
+            });
+            appliedTokensRef.current.add(reviewJob.token);
+            ackJob(reviewJob.token);
+            closeReview();
+            notices.createSuccessNotice(getString("reviewApplied", __("Translation applied in the editor. Review and save the post when ready.", "rrze-webt")), { id: "rrze-webt-applied" });
+        };
+
+        /** @returns {Object|null} Plain-text comparison; provider HTML is never executed. */
+        const renderReview = () => {
+            if (!reviewJob) return null;
+            // The subscribed values above make validation respond to editor changes.
+            const validation = validateReview(reviewJob);
+            const error = reviewError || validation.error;
+            return wp.element.createElement(
+                Modal,
+                { title: getString("reviewTranslation", __("Review translation", "rrze-webt")), onRequestClose: closeReview, className: "rrze-webt-review-modal" },
+                wp.element.createElement("p", null, getString("reviewInstructions", __("Compare the text before replacing the editor title and content. Formatting is checked separately. Saving remains a separate WordPress action.", "rrze-webt"))),
+                wp.element.createElement("div", { className: "rrze-webt-review-columns" },
+                    wp.element.createElement("section", null,
+                        wp.element.createElement("h3", null, getString("reviewOriginal", __("Submitted original", "rrze-webt"))),
+                        wp.element.createElement("h4", null, reviewJob.sourceTitle || getString("reviewNoTitle", __("(No title)", "rrze-webt"))),
+                        wp.element.createElement("div", { className: "rrze-webt-text-preview" }, reviewJob.sourcePreview || "")
+                    ),
+                    wp.element.createElement("section", null,
+                        wp.element.createElement("h3", null, getString("reviewResult", __("Translation", "rrze-webt"))),
+                        wp.element.createElement("h4", null, reviewJob.title || getString("reviewNoTitle", __("(No title)", "rrze-webt"))),
+                        wp.element.createElement("div", { className: "rrze-webt-text-preview" }, reviewJob.preview || "")
+                    )
+                ),
+                error && wp.element.createElement(Notice, { status: "warning", isDismissible: false }, error),
+                wp.element.createElement("div", { className: "rrze-webt-review-actions" },
+                    wp.element.createElement(Button, { variant: "secondary", onClick: closeReview }, getString("reviewCancel", __("Cancel", "rrze-webt"))),
+                    wp.element.createElement(Button, {
+                        variant: "primary", onClick: applyReviewedTranslation,
+                        disabled: !!error || appliedTokensRef.current.has(reviewJob.token),
+                    }, getString("reviewApply", __("Apply in editor", "rrze-webt")))
+                )
+            );
+        };
+
+        /**
          * Submit editor content once and refresh persisted job state on every outcome.
          *
          * A browser abort only stops waiting; it cannot cancel provider processing.
@@ -707,40 +833,9 @@
                 },
                 signal: controller ? controller.signal : undefined,
             })
-                /** @param {Object} response Persisted job or legacy translation response. */
+                /** @param {Object} response Persisted asynchronous job response. */
                 .then((response) => {
-                    if (response && response.translation) {
-                        if (typeof response.translation === "string") {
-                            dataDispatch("core/editor").editPost({
-                                content: response.translation,
-                            });
-                        } else {
-                            const update = {};
-
-                            if (response.translation.content) {
-                                update.content = response.translation.content;
-                            }
-
-                            if (response.translation.title) {
-                                update.title = response.translation.title;
-                            }
-
-                            if (Object.keys(update).length) {
-                                dataDispatch("core/editor").editPost(update);
-                            }
-                        }
-                        notices.createSuccessNotice(
-                            getString(
-                                "successNotice",
-                                __(
-                                    "Content translated successfully.",
-                                    "rrze-webt"
-                                )
-                            ),
-                            { id: "rrze-webt-success" }
-                        );
-                        finalize();
-                    } else if (response && response.token && response.status) {
+                    if (response && response.token && response.status) {
                         notices.createInfoNotice(jobSubmittedMsg, {
                             id: "rrze-webt-job-submitted",
                         });
@@ -796,6 +891,7 @@
                 jobListTitle
             ),
             renderJobs(),
+            renderReview(),
             !hasCredentials &&
                 wp.element.createElement(
                     Notice,

@@ -158,7 +158,7 @@ class JobStore
                 if (! $job) {
                     return null;
                 }
-                unset($changes['token'], $changes['post_id'], $changes['fingerprint'], $changes['api_version']);
+                unset($changes['token'], $changes['post_id'], $changes['fingerprint'], $changes['api_version'], $changes['source_content'], $changes['source_title']);
                 if (isset($changes['request_id']) && $job['request_id'] !== ''
                     && (string) $changes['request_id'] !== (string) $job['request_id']) {
                     return new WP_Error('rrze_webt_request_id_conflict', __('The service returned conflicting translation request IDs.', 'rrze-webt'), ['status' => 502]);
