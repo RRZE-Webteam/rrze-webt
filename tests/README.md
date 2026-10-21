@@ -83,7 +83,7 @@ die Prüfung selbst bleibt bestehen.
 Der Bericht gibt außerdem an, ob eigene Entwurfsseiten zurückgeblieben sind.
 PHP-Deprecation-Meldungen anderer installierter Plugins werden nicht unterdrückt.
 
-## Protokolle und Stand nach Schritt 2
+## Protokolle und Stand nach Schritt 3
 
 **V2** ist jetzt der Standard für alle neuen Aufträge und die Job-Tests. Geprüft
 werden die exakte `askTranslate`-Adresse, eine einzelne POST-Anfrage mit Basic
@@ -109,6 +109,21 @@ Dateilieferung, ungültiges Base64, leere Ergebnisse, falsche Dateiformate,
 ungültige und sehr große Auftragsnummern, Anbieterfehler, unsichere oder alte
 Endpunkte, WordPress-Locale-Codes und falsch zugeordnete Fehlerbenachrichtigungen.
 
+Schritt 3 behebt zusätzlich `early_callback`, `duplicate_callback`,
+`repeated_submit` und `trace_timeout`. Der lokale Auftrag existiert jetzt vor
+dem HTTP-Aufruf. Identische Wiederholungen verwenden denselben aktiven Auftrag;
+abweichender Inhalt wird bis zu dessen Abschluss oder Ablauf mit HTTP 409
+abgewiesen. Ein unsicherer Transportausgang bleibt als wartender Auftrag sichtbar.
+Der erste abgeschlossene oder fehlgeschlagene Zustand bleibt bestehen, auch bei
+späteren widersprüchlichen Rückmeldungen. Die Historie behält alle aktiven und
+die letzten drei nach Einreichung sortierten beendeten Aufträge.
+
+Stand der lokalen Prüfung am 21. Oktober 2026: **40 PASS, 2 KNOWN, 0 FAIL,
+0 XPASS**, keine zurückgebliebenen Testentwürfe. Offen bleiben
+`acknowledge_permission` (Berechtigung zur Bestätigung, Schritt 6) und
+`preserve_post` (bewusste Übernahme statt automatischem Überschreiben, Schritt 4).
+Die allgemeine REST-Sperre der Website erscheint weiterhin als `ENV BLOCKED`.
+
 Quellen des simulierten Formats, geprüft am 20. Oktober 2026:
 
 - [Einführung in eTranslation REST v2](https://language-tools.ec.europa.eu/dev-corner/etranslation/rest-v2/introduction)
@@ -128,6 +143,14 @@ Dass diese Fixtures erhalten bleiben, belegt noch nicht, dass die echte EU-
 - Abgeschnittenes JSON und gültiges JSON ohne Übersetzungsdaten.
 - Ausbleibende Rückmeldung mit abgelaufener Auftragsfrist.
 - Rückmeldung vor der Annahmeantwort, doppelte Rückmeldung und doppelte Anfrage.
+- Frühe Erfolgsmeldung oder Fehlerrückmeldung sowie Lieferung vor oder nach einem Transport-Timeout.
+- Widersprüchliche Auftragsnummern in Rückruf und Annahmeantwort.
+- Erneutes Absenden während des laufenden HTTP-Aufrufs ohne zweite Anbieteranfrage.
+- Gesperrte Datenbankänderungen mit einer unabhängigen zweiten Verbindung und HTTP 503 ohne Zustandsverlust.
+- Fehlgeschlagene Speicherung des Auftrags oder Indexes verhindert den HTTP-Aufruf.
+- Geänderter Inhalt, Titel oder Zielsprache bei einem noch aktiven Auftrag.
+- Widersprüchliche oder verspätete Rückrufe nach Erfolg, Fehler oder Fristablauf.
+- Erneutes Absenden nach Ablauf sowie Begrenzung der Historie ohne Verlust aktiver Aufträge.
 - Falsche Auftragsnummer oder Zielsprache im Callback.
 - Anonyme Zugriffe auf Übersetzen, Auftragsliste und Auftragsbestätigung.
 - Erhalt des gespeicherten Ausgangsinhalts bis zur bewussten Übernahme.
@@ -136,8 +159,26 @@ Dass diese Fixtures erhalten bleiben, belegt noch nicht, dass die echte EU-
 Eine Verzögerung wird durch eine explizit freigegebene Callback-Warteschlange
 simuliert. Für abgelaufene Jobs wird nur der Ablaufzeitpunkt des Testauftrags in
 die Vergangenheit gesetzt. Die Tests warten weder 20 Sekunden noch fünf Minuten.
-Echte parallele PHP-Prozesse, Browser-Timeouts, TLS und externe Erreichbarkeit sind
-damit noch nicht geprüft.
+Eine verschachtelte Anfrage simuliert den erneuten Klick während des HTTP-Aufrufs.
+Eine unabhängige Datenbankverbindung prüft die echte Sperrwirkung von `GET_LOCK`
+und dass während des HTTP-Aufrufs keine Sperre gehalten wird. Echte parallele
+PHP-Prozesse, Browser-Netzwerk-Timeouts, TLS und externe Erreichbarkeit sind damit
+noch nicht geprüft.
+
+## Editor-Anfragen ohne Browser prüfen
+
+Mit Node.js ab Version 18, ohne zusätzliche Testabhängigkeiten:
+
+```sh
+npm run test:editor
+```
+
+Drei Prüfungen führen den tatsächlichen Quelltext aus `src/editor.js` mit einem
+kleinen simulierten WordPress-Host aus. Sie prüfen die Annahme eines vorhandenen
+Auftrags ohne Anbieter-ID, einen REST-Fehler und einen Browser-Abbruch. In allen
+Fällen wird die Historie erneut geladen; die Abbruchmeldung behauptet keine
+Stornierung beim Anbieter. Hooks werden nur einmal gerendert. Diese Prüfungen
+decken weder das React-Layout noch einen echten Browser-Netzwerkabbruch ab.
 
 ## Umgebung, Isolation und Aufräumen
 

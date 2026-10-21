@@ -103,7 +103,11 @@ class EditorAssets
             'siteLanguage'          => (string) $this->settings->get_site_language(),
             'pollInterval'          => (int) apply_filters('rrze_webt_poll_interval', 5000),
 
-            'clientRequestTimeoutMs' => (int) apply_filters('rrze_webt_client_timeout_ms', 20000), // 20s
+            // Give the server time to record an uncertain provider timeout first.
+            'clientRequestTimeoutMs' => max(
+                (max(1, (int) apply_filters('rrze_webt_http_timeout', 20)) + 10) * 1000,
+                (int) apply_filters('rrze_webt_client_timeout_ms', 30000)
+            ),
             'jobMaxAgeMs'            => (int) apply_filters('rrze_webt_job_max_age_ms', 5 * 60 * 1000), // 5min            
 
             'i18n' => [

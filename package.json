@@ -2,7 +2,8 @@
   "scripts": {
     "build": "wp-scripts build",
     "start": "wp-scripts start",
-    "test:integration": "bash tests/run.sh"
+    "test:integration": "bash tests/run.sh",
+    "test:editor": "node --test tests/editor-lifecycle.test.cjs"
   },
   "devDependencies": {
     "@wordpress/scripts": "^30.25.0"

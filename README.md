@@ -6,7 +6,8 @@ Integrates eTranslation REST v2 into the WordPress block editor so authors can t
 
 - Sidebar panel in the block editor to trigger WEB-T translations.
 - Submits asynchronous document requests and receives translations via custom REST endpoints.
-- Translation history limited to the three most recent jobs per post with detailed status (pending/completed/failed).
+- Translation history retains every pending job and the three most recently submitted finished jobs per post, with detailed status (pending/completed/failed).
+- Local job reservation before dispatch, duplicate submission protection and traceable transport failures.
 - Manual source/target selections.
 - Stores translations in post meta to keep context across sessions.
 
@@ -14,6 +15,7 @@ Integrates eTranslation REST v2 into the WordPress block editor so authors can t
 
 - WordPress 6.8 or newer.
 - PHP 8.2 or newer.
+- MySQL/MariaDB with connection-scoped `GET_LOCK` / `RELEASE_LOCK` support on the database server used for post metadata.
 - Valid WEB-T (eTranslation) API credentials (application name & password).
 
 ## Installation
@@ -59,11 +61,48 @@ disabled. Timeout, TLS verification and HTTP-version filters remain available.
 
 The callback URLs must be reachable from the EU service. Local development uses
 the explicit CLI simulator described below. A normal editor request still uses
-the configured service. Job timing, duplicate handling and explicit application
-of results remain separate repair steps; callbacks currently still update posts
-automatically.
+the configured service. Explicit application of results remains a separate repair
+step; callbacks currently still update posts automatically.
 
 Protocol reference: [official REST v2 OpenAPI contract](https://language-tools.ec.europa.eu/assets/downloads/eTranslation-RestV2.yaml).
+
+### Job lifecycle
+
+The plugin saves a local job and token before contacting eTranslation. A valid
+callback can therefore arrive before the submission response. The first valid
+provider ID is bound to the job; a later conflicting ID is rejected. A success
+notification binds the ID but does not complete the job without a document.
+
+While a job is pending, submitting identical content, title and languages for the
+same post returns that job without another provider request. Different input is
+rejected with HTTP 409 until the pending job finishes or expires. Jobs distinguish
+submission in progress (`submitting`), provider acceptance (`accepted`), an
+unconfirmed outcome (`uncertain`) and explicit rejection (`rejected`). The job
+itself remains `pending` until completion or failure.
+
+A transport timeout, server error or malformed acknowledgement may occur after
+the provider has accepted the document. Such a job remains pending and is not
+automatically resubmitted. A later valid callback can still complete it. Without
+a result it expires after five minutes by default, controlled by
+`rrze_webt_job_max_age_seconds`. Expiration is checked when listing jobs, submitting
+another request or receiving a callback. It does not cancel processing at the
+provider; a manual submission after expiration may start new provider work.
+
+The first terminal state (`completed` or `failed`) is retained. Duplicate or late
+callbacks cannot overwrite the result or apply it to the post again. History is
+ordered by submission, retaining all pending jobs and the newest three terminal
+jobs. Acknowledgement does not reorder it.
+
+Short per-post database locks serialize state changes. No lock is held during the
+provider HTTP request. Lock contention or unavailable lock support returns HTTP
+503 without an unlocked write. This relies on all relevant connections sharing
+one MySQL/MariaDB lock namespace; custom database routing or multiple writable
+database servers require additional validation.
+
+The editor waits at least ten seconds longer than the configured provider HTTP
+timeout (30 seconds versus 20 seconds by default). It refreshes the history after
+success, errors and browser aborts. Aborting the browser request stops waiting;
+it cannot cancel an already submitted translation.
 
 ## Usage
 
@@ -86,6 +125,7 @@ Protocol reference: [official REST v2 OpenAPI contract](https://language-tools.e
 - `npm run build` – Bundles `src/editor.js` and `src/editor.scss` into `build/editor.js` and `build/editor.css`.
 - `npm run start` – Watches the same sources and rebuilds into `build/` on changes.
 - `npm run test:integration -- <local-site-url>` – Runs the network-isolated WordPress integration tests. See [local simulation and tests](tests/README.md) for prerequisites, scenarios and known failures.
+- `npm run test:editor` – Checks editor request handling with Node's built-in test runner, without WordPress or network access.
 
 ### Release archives
 

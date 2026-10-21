@@ -171,7 +171,7 @@ final class IntegrationSuite
             'delivery_v2' => 'A v2 delivery yields translated HTML, not raw JSON.',
             'success_notification' => 'Notifications before or after delivery do not replace content.',
             'invalid_delivery' => 'Invalid Base64, empty results and wrong formats cannot write a post.',
-            'invalid_acknowledgement' => 'Malformed acknowledgements cannot create phantom pending jobs.',
+            'invalid_acknowledgement' => 'Malformed acknowledgements remain unconfirmed until timeout.',
             'provider_errors' => 'Provider validation, authentication and quota errors remain failures.',
             'endpoint_validation' => 'Unsafe or known v1 endpoints fail before sending credentials.',
             'locale_codes' => 'WordPress locales become two-letter API and job language codes.',
@@ -180,6 +180,19 @@ final class IntegrationSuite
             'duplicate_callback' => 'A duplicate delivery has no additional post-write effects.',
             'repeated_submit' => 'Repeated submissions do not create parallel active jobs.',
             'trace_timeout' => 'A transport failure leaves a traceable local job.',
+            'early_failure' => 'A failure before acknowledgement is never reset to pending.',
+            'early_notification' => 'An early notification binds the remote ID without completing the job.',
+            'callback_then_timeout' => 'An early completed result survives a lost acknowledgement.',
+            'timeout_then_callback' => 'An unconfirmed request is reused and can still receive its result.',
+            'ack_id_conflict' => 'A contradictory acknowledgement cannot replace the callback request ID.',
+            'submit_during_dispatch' => 'Reentrant submission reuses the reservation with no network-phase lock.',
+            'lock_contention' => 'A second DB connection prevents concurrent writes without losing the job.',
+            'storage_failure' => 'Failed job or index persistence prevents provider dispatch.',
+            'competing_input' => 'Changed content or language is rejected while a post has active work.',
+            'terminal_order' => 'Terminal jobs ignore replays and contradictory late notifications.',
+            'expiry_resubmit' => 'Expiration permits a new request and ignores the old late delivery.',
+            'history_retention' => 'History trimming retains active jobs and the newest three terminal jobs.',
+            'missing_post' => 'Requests without a persistable post never reach the provider.',
             'unknown_payload' => 'Valid but unrelated JSON is rejected as translation content.',
             'callback_correlation' => 'Mismatching request ID or language cannot complete a job.',
             'acknowledge_permission' => 'Anonymous users cannot acknowledge a job.',
@@ -656,7 +669,7 @@ final class IntegrationSuite
     /**
      * Reject invalid IDs, while retaining large valid identifiers without rounding.
      *
-     * @return bool Whether invalid acknowledgements create no job and a large ID survives.
+     * @return bool Whether invalid acknowledgements remain unconfirmed and a large valid ID survives.
      */
     private function invalid_acknowledgement(): bool
     {
@@ -670,14 +683,17 @@ final class IntegrationSuite
             $this->simulator->reset();
             $this->simulator->submission_response = ['status' => 200, 'body' => $body];
             $response = $this->submit();
-            if ($response->get_status() !== 502 || (new JobStore())->get_jobs_for_post($this->post_id) !== []) {
+            $job = (new JobStore())->get_jobs_for_post($this->post_id)[0] ?? [];
+            if ($response->get_status() !== 502 || ($job['status'] ?? '') !== 'pending'
+                || $job['request_id'] !== '' || $job['submission_state'] !== 'uncertain') {
                 return false;
             }
+            $this->expire_pending_jobs();
         }
         $this->simulator->submission_response = ['status' => 200, 'body' => '{"requestId":9223372036854775808}'];
         $response = $this->submit();
         $jobs = (new JobStore())->get_jobs_for_post($this->post_id);
-        return $response->get_status() === 202 && count($jobs) === 1
+        return $response->get_status() === 202 && count($jobs) >= 1
             && $response->get_data()['jobId'] === '9223372036854775808'
             && $jobs[0]['request_id'] === '9223372036854775808';
     }
@@ -685,7 +701,7 @@ final class IntegrationSuite
     /**
      * Keep provider failures distinct from acknowledgements and avoid response leaks.
      *
-     * @return bool Whether failures retain an error status without creating local jobs.
+     * @return bool Whether failures retain diagnostics and distinguish rejection from uncertainty.
      */
     private function provider_errors(): bool
     {
@@ -705,9 +721,15 @@ final class IntegrationSuite
                 || str_contains($actual_message, 'private document echo')
                 || (is_array($body) && ($response->get_data()['data']['remote_code'] ?? null) !== $body['errorCode'])
                 || count($this->simulator->requests) !== 1
-                || (new JobStore())->get_jobs_for_post($this->post_id) !== []) {
+                || (new JobStore())->get_jobs_for_post($this->post_id) === []) {
                 return false;
             }
+            $job = (new JobStore())->get_jobs_for_post($this->post_id)[0];
+            if ($job['status'] !== ($status >= 500 ? 'pending' : 'failed')
+                || $job['error_code'] !== $response->get_data()['code']) {
+                return false;
+            }
+            $this->expire_pending_jobs();
         }
         return true;
     }
@@ -818,9 +840,11 @@ final class IntegrationSuite
      */
     private function repeated_submit(): bool
     {
-        $this->accepted();
-        $this->submit();
-        return count($this->simulator->queue) === 1
+        $receipt = $this->accepted();
+        $repeat = $this->submit();
+        return $repeat->get_status() === 202 && $repeat->get_data()['reused']
+            && $repeat->get_data()['token'] === $receipt['externalReference']
+            && count($this->simulator->requests) === 1 && count($this->simulator->queue) === 1
             && count((new JobStore())->get_jobs_for_post($this->post_id)) === 1;
     }
 
@@ -833,7 +857,321 @@ final class IntegrationSuite
     {
         $this->simulator->reset('v2', 'timeout');
         $this->require_true($this->submit()->get_status() >= 400, 'Timeout fixture did not return an error.');
-        return count((new JobStore())->get_jobs_for_post($this->post_id)) === 1;
+        $jobs = (new JobStore())->get_jobs_for_post($this->post_id);
+        return count($jobs) === 1 && $jobs[0]['status'] === 'pending'
+            && $jobs[0]['submission_state'] === 'uncertain' && $jobs[0]['request_id'] === ''
+            && $jobs[0]['error_code'] === 'http_request_failed';
+    }
+
+    /**
+     * Advance only this case's pending job deadlines without waiting on wall time.
+     *
+     * @return void
+     */
+    private function expire_pending_jobs(): void
+    {
+        $store = new JobStore();
+        foreach ($store->get_jobs_for_post($this->post_id) as $job) {
+            if ($job['status'] === 'pending') {
+                $updated = $store->update_job_status($job['token'], ['expires_at' => time() - 1]);
+                $this->require_true(is_array($updated), 'Could not expire the fixture job.');
+            }
+        }
+        $this->require_true($this->request('GET', 'jobs/' . $this->post_id)->get_status() === 200, 'Expiration failed.');
+    }
+
+    /**
+     * Deliver a failure before the initial HTTP acknowledgement.
+     *
+     * @return bool Whether the terminal failure and message survive reconciliation.
+     */
+    private function early_failure(): bool
+    {
+        $this->simulator->reset('v2', 'early-failure');
+        $response = $this->submit();
+        $job = $this->job($this->simulator->queue[0]);
+        return $response->get_status() === 202 && $response->get_data()['status'] === 'failed'
+            && $job['status'] === 'failed' && $job['message'] === 'Cannot convert input file'
+            && $job['error_code'] === '-30000' && $this->post_updates === 0;
+    }
+
+    /**
+     * Bind a remote ID from a validated early completion notice.
+     *
+     * @return bool Whether the job remains pending and the ID lookup resolves it.
+     */
+    private function early_notification(): bool
+    {
+        $this->simulator->reset('v2', 'early-notification');
+        $response = $this->submit();
+        $receipt = $this->simulator->queue[0];
+        $job = $this->job($receipt);
+        return $response->get_status() === 202 && $job['status'] === 'pending'
+            && (new JobStore())->get_job_by_request_id((string) $receipt['requestId']) === $job
+            && $this->post_updates === 0 && $this->simulator->deliver($receipt)->get_status() === 200;
+    }
+
+    /**
+     * Deliver the document and then lose the provider's HTTP acknowledgement.
+     *
+     * @return bool Whether the validated completion takes precedence over the timeout.
+     */
+    private function callback_then_timeout(): bool
+    {
+        $this->simulator->reset('v2', 'early-timeout');
+        $response = $this->submit();
+        return $response->get_status() === 202 && $response->get_data()['status'] === 'completed'
+            && $this->job($this->simulator->queue[0])['content'] === $this->simulator->fixture('translation.html');
+    }
+
+    /**
+     * Lose the acknowledgement, repeat the request, then receive the delayed result.
+     *
+     * @return bool Whether one provider submission suffices and its local token stays stable.
+     */
+    private function timeout_then_callback(): bool
+    {
+        $this->simulator->reset('v2', 'accepted-timeout');
+        $response = $this->submit();
+        $receipt = $this->simulator->queue[0];
+        $job = $this->job($receipt);
+        $repeat = $this->submit();
+        return $response->get_status() >= 400 && $job['submission_state'] === 'uncertain'
+            && $job['request_id'] === '' && $repeat->get_status() === 202
+            && $repeat->get_data()['token'] === $receipt['externalReference']
+            && $repeat->get_data()['jobId'] === '' && $repeat->get_data()['reused']
+            && count($this->simulator->requests) === 1
+            && $this->simulator->deliver($receipt)->get_status() === 200
+            && $this->job($receipt)['status'] === 'completed';
+    }
+
+    /**
+     * Return a contradictory ID after a validated early delivery.
+     *
+     * @return bool Whether the original ID and completed result remain authoritative.
+     */
+    private function ack_id_conflict(): bool
+    {
+        $this->simulator->reset('v2', 'early-conflict');
+        $response = $this->submit();
+        $receipt = $this->simulator->queue[0];
+        $job = $this->job($receipt);
+        return $response->get_status() === 502 && $response->get_data()['code'] === 'rrze_webt_request_id_conflict'
+            && $job['status'] === 'completed' && $job['request_id'] === (string) $receipt['requestId']
+            && (new JobStore())->get_job_by_request_id((string) ($receipt['requestId'] + 1)) === null;
+    }
+
+    /**
+     * Compute the production lock name for a real independent-connection probe.
+     *
+     * @return string Site-specific lock for this disposable post.
+     */
+    private function fixture_lock_name(): string
+    {
+        global $wpdb;
+        return 'rrze-webt:' . sha1(DB_NAME . ':' . $wpdb->postmeta . ':' . $this->post_id);
+    }
+
+    /**
+     * Repeat submission while HTTP is in flight and verify the DB lock is released.
+     *
+     * @return bool Whether the second submission reuses the already-persisted reservation.
+     */
+    private function submit_during_dispatch(): bool
+    {
+        $nested = null;
+        $unlocked = false;
+        $this->simulator->on_submit =
+            /** @return void Probe from another DB connection, then reenter the REST route. */
+            function () use (&$nested, &$unlocked): void {
+                $peer = new \wpdb(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST);
+                $name = $this->fixture_lock_name();
+                try {
+                    $unlocked = (string) $peer->get_var($peer->prepare('SELECT GET_LOCK(%s, 0)', $name)) === '1';
+                    if ($unlocked) {
+                        $peer->get_var($peer->prepare('SELECT RELEASE_LOCK(%s)', $name));
+                    }
+                    $nested = $this->submit();
+                } finally {
+                    $peer->close();
+                }
+            };
+        $response = $this->submit();
+        return $unlocked && $response->get_status() === 202 && $nested->get_status() === 202
+            && $nested->get_data()['reused'] && $nested->get_data()['jobId'] === ''
+            && $response->get_data()['token'] === $nested->get_data()['token']
+            && count($this->simulator->requests) === 1;
+    }
+
+    /**
+     * Hold the lock from another DB connection while submission and callback arrive.
+     *
+     * @return bool Whether both operations fail closed, then delivery succeeds after release.
+     */
+    private function lock_contention(): bool
+    {
+        $receipt = $this->accepted();
+        $peer = new \wpdb(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST);
+        $name = $this->fixture_lock_name();
+        try {
+            $this->require_true((string) $peer->get_var($peer->prepare('SELECT GET_LOCK(%s, 0)', $name)) === '1', 'Could not acquire independent fixture lock.');
+            $repeat = $this->submit();
+            $delivery = $this->simulator->deliver($receipt);
+            $blocked = $repeat->get_status() === 503 && $delivery->get_status() === 503
+                && $this->job($receipt)['status'] === 'pending' && $this->post_updates === 0
+                && count($this->simulator->requests) === 1;
+        } finally {
+            $peer->get_var($peer->prepare('SELECT RELEASE_LOCK(%s)', $name));
+            $peer->close();
+        }
+        return $blocked && $this->simulator->deliver($receipt)->get_status() === 200
+            && $this->job($receipt)['status'] === 'completed';
+    }
+
+    /**
+     * Reject provider dispatch if either the job record or its index cannot be saved.
+     *
+     * @return bool Whether both storage failures leave no submitted or orphaned fixture job.
+     */
+    private function storage_failure(): bool
+    {
+        foreach (['job', 'index'] as $kind) {
+            $hook = $kind === 'job' ? 'add_post_metadata' : 'update_post_metadata';
+            $block =
+                /**
+                 * Simulate storage failure for this disposable post only.
+                 * @param mixed $check Earlier filter result.
+                 * @param int $object_id Owning post ID.
+                 * @param string $key Metadata key being written.
+                 * @return mixed False for the selected write, otherwise the original result.
+                 */
+                function ($check, int $object_id, string $key) use ($kind) {
+                    $matches = $kind === 'job' ? str_starts_with($key, '_rrze_webt_job_') : $key === '_rrze_webt_jobs_index';
+                    return $object_id === $this->post_id && $matches ? false : $check;
+                };
+            add_filter($hook, $block, PHP_INT_MAX, 3);
+            try {
+                $response = $this->submit();
+            } finally {
+                remove_filter($hook, $block, PHP_INT_MAX);
+            }
+            if ($response->get_status() !== 503 || $this->simulator->requests !== []
+                || (new JobStore())->get_jobs_for_post($this->post_id) !== []) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Protect the current active request from competing content and language choices.
+     *
+     * @return bool Whether incompatible input is rejected without sending another job.
+     */
+    private function competing_input(): bool
+    {
+        $receipt = $this->accepted();
+        foreach ([['content' => '<p>Geänderter Inhalt</p>'], ['target_language' => 'DE'], ['title' => 'Anderer Titel']] as $change) {
+            $response = $this->request('POST', 'translate', array_merge([
+                'post_id' => $this->post_id, 'title' => 'Lokaler Test',
+                'content' => $this->simulator->fixture('source.html'),
+                'source_language' => 'DE', 'target_language' => 'EN',
+            ], $change));
+            if ($response->get_status() !== 409) {
+                return false;
+            }
+        }
+        return count($this->simulator->requests) === 1 && $this->job($receipt)['status'] === 'pending';
+    }
+
+    /**
+     * Deliver contradictory callbacks after each possible terminal result.
+     *
+     * @return bool Whether the first terminal result wins without further post writes.
+     */
+    private function terminal_order(): bool
+    {
+        $receipt = $this->accepted();
+        $this->require_true($this->simulator->deliver($receipt)->get_status() === 200, 'First completion failed.');
+        $job = $this->job($receipt);
+        $updates = $this->post_updates;
+        $late_failure = $this->simulator->deliver($receipt, 'failure');
+        $changed_replay = $this->simulator->deliver($receipt, 'success', ['result' => base64_encode('<p>Wrong late document</p>')]);
+        if ($late_failure->get_status() !== 200 || $changed_replay->get_status() !== 200
+            || $this->job($receipt) !== $job || $this->post_updates !== $updates) {
+            return false;
+        }
+        $this->require_true($this->submit()->get_status() === 202, 'New request after completion failed.');
+        $second = $this->simulator->queue[1];
+        $this->require_true($this->simulator->deliver($second, 'failure')->get_status() === 200, 'Failure delivery failed.');
+        $failed = $this->job($second);
+        return $this->simulator->deliver($second)->get_status() === 200
+            && $this->job($second) === $failed && $failed['status'] === 'failed'
+            && $this->post_updates === $updates;
+    }
+
+    /**
+     * Resubmit after expiry and receive the old result after the replacement exists.
+     *
+     * @return bool Whether only the replacement job can complete or write the post.
+     */
+    private function expiry_resubmit(): bool
+    {
+        $first = $this->accepted();
+        (new JobStore())->update_job_status($first['externalReference'], ['expires_at' => time() - 1]);
+        $next = $this->submit();
+        if ($next->get_status() !== 202 || count($this->simulator->queue) !== 2
+            || $this->job($first)['status'] !== 'failed'
+            || $this->simulator->deliver($first)->get_status() !== 200 || $this->post_updates !== 0) {
+            return false;
+        }
+        $second = $this->simulator->queue[1];
+        return $this->simulator->deliver($second)->get_status() === 200
+            && $this->job($second)['status'] === 'completed';
+    }
+
+    /**
+     * Retain old active jobs even when newer terminal history exceeds its limit.
+     *
+     * @return bool Whether the active job and latest three terminal jobs survive trimming.
+     */
+    private function history_retention(): bool
+    {
+        $store = new JobStore();
+        $active = $this->seed_job();
+        $tokens = [];
+        for ($index = 0; $index < 4; $index++) {
+            $token = wp_generate_uuid4();
+            $tokens[] = $token;
+            $job = $store->create_job([
+                'token' => $token, 'post_id' => $this->post_id, 'request_id' => (string) (882000 + $index),
+                'status' => 'failed', 'source_language' => 'DE', 'target_language' => 'EN',
+            ]);
+            $this->require_true(is_array($job), 'Could not create terminal history fixture.');
+        }
+        return count($store->get_jobs_for_post($this->post_id)) === 4
+            && $this->job($active)['status'] === 'pending'
+            && $store->get_job_by_token($tokens[0]) === null
+            && $store->get_job_by_request_id('882000') === null
+            && $store->get_job_by_token($tokens[3]) !== null;
+    }
+
+    /**
+     * Reject missing or invalid post IDs before reserving a job or calling HTTP.
+     *
+     * @return bool Whether unpersistable requests are rejected locally.
+     */
+    private function missing_post(): bool
+    {
+        foreach ([0, -1, PHP_INT_MAX] as $post_id) {
+            $response = $this->request('POST', 'translate', [
+                'post_id' => $post_id, 'content' => '<p>Test</p>', 'source_language' => 'DE', 'target_language' => 'EN',
+            ]);
+            if ($response->get_status() < 400 || $this->simulator->requests !== []) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

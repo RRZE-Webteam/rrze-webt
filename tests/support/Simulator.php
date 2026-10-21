@@ -39,6 +39,9 @@ final class Simulator
     /** @var string|null Optional endpoint override for configuration checks. */
     public ?string $endpoint = null;
 
+    /** @var callable|null One-shot callback executed while the provider request is in flight. */
+    public $on_submit = null;
+
     /** @var array<int,int> Callback status codes, including early callbacks. */
     public array $callback_statuses = [];
 
@@ -75,13 +78,13 @@ final class Simulator
      * Reset transport observations and the deterministic callback queue.
      *
      * @param string $protocol Wire format to simulate.
-     * @param string $scenario Success, unauthorized, timeout or early.
+     * @param string $scenario Controlled acknowledgement, callback-order or transport scenario.
      * @return void
      */
     public function reset(string $protocol = 'v2', string $scenario = 'success'): void
     {
         if (! in_array($protocol, ['legacy', 'v2'], true)
-            || ! in_array($scenario, ['success', 'unauthorized', 'timeout', 'early'], true)) {
+            || ! in_array($scenario, ['success', 'unauthorized', 'timeout', 'early', 'early-failure', 'early-notification', 'early-timeout', 'early-conflict', 'accepted-timeout'], true)) {
             throw new RuntimeException('Unknown simulator protocol or scenario.');
         }
 
@@ -92,6 +95,7 @@ final class Simulator
         $this->callback_statuses = [];
         $this->submission_response = null;
         $this->endpoint = null;
+        $this->on_submit = null;
         $this->next_id = $this->fixture('v2-accepted.json')['requestId'];
     }
 
@@ -242,11 +246,22 @@ final class Simulator
         ];
         $this->queue[] = $receipt;
 
-        if ($this->scenario === 'early') {
-            $this->deliver($receipt);
+        if (is_callable($this->on_submit)) {
+            $during_submit = $this->on_submit;
+            $this->on_submit = null;
+            $during_submit($receipt);
         }
-
-        return $this->response(200, ['requestId' => $receipt['requestId']]);
+        if (in_array($this->scenario, ['early', 'early-timeout', 'early-conflict'], true)) {
+            $this->deliver($receipt);
+        } elseif ($this->scenario === 'early-failure') {
+            $this->deliver($receipt, 'failure');
+        } elseif ($this->scenario === 'early-notification') {
+            $this->deliver($receipt, 'notification');
+        }
+        if (in_array($this->scenario, ['early-timeout', 'accepted-timeout'], true)) {
+            return new WP_Error('http_request_failed', 'Simulated acknowledgement lost after acceptance.');
+        }
+        return $this->response(200, ['requestId' => $receipt['requestId'] + ($this->scenario === 'early-conflict' ? 1 : 0)]);
     }
 
     /**

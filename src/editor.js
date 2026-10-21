@@ -644,6 +644,12 @@
             });
         };
 
+        /**
+         * Submit editor content once and refresh persisted job state on every outcome.
+         *
+         * A browser abort only stops waiting; it cannot cancel provider processing.
+         * @returns {void}
+         */
         const translateContent = () => {
             if (!hasCredentials) {
                 setErrorMessage(
@@ -673,12 +679,13 @@
             setIsTranslating(true);
             setErrorMessage("");
 
+            /** @returns {void} Clear the local submission indicator. */
             const finalize = () => {
                 setIsTranslating(false);
             };
 
             const clientTimeoutMs =
-                Number(config.clientRequestTimeoutMs) || 20000;
+                Number(config.clientRequestTimeoutMs) || 30000;
 
             const controller =
                 typeof AbortController !== "undefined"
@@ -700,6 +707,7 @@
                 },
                 signal: controller ? controller.signal : undefined,
             })
+                /** @param {Object} response Persisted job or legacy translation response. */
                 .then((response) => {
                     if (response && response.translation) {
                         if (typeof response.translation === "string") {
@@ -732,13 +740,10 @@
                             { id: "rrze-webt-success" }
                         );
                         finalize();
-                    } else if (response && response.jobId) {
+                    } else if (response && response.token && response.status) {
                         notices.createInfoNotice(jobSubmittedMsg, {
                             id: "rrze-webt-job-submitted",
                         });
-                        if (jobsFetcherRef.current) {
-                            jobsFetcherRef.current();
-                        }
                         finalize();
                     } else {
                         throw new Error(
@@ -749,6 +754,7 @@
                         );
                     }
                 })
+                /** @param {Error} error Transport or REST failure. */
                 .catch((error) => {
                     const aborted =
                         error &&
@@ -756,7 +762,7 @@
                             /aborted/i.test(error.message || ""));
                     const message = aborted
                         ? __(
-                              "Request cancelled due to client-side timeout.",
+                              "The browser stopped waiting. The translation may still be running; check the job history.",
                               "rrze-webt"
                           )
                         : error && error.message
@@ -771,8 +777,12 @@
                         isDismissible: true,
                     });
                 })
+                /** @returns {void} Refresh even after an error or a client-side abort. */
                 .finally(() => {
                     if (timeoutId) clearTimeout(timeoutId);
+                    if (jobsFetcherRef.current) {
+                        jobsFetcherRef.current();
+                    }
                     finalize();
                 });
         };
